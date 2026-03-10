@@ -1,0 +1,383 @@
+<ion-header class="mp-header">
+  <ion-toolbar class="mp-toolbar">
+    <ion-title class="mp-title">MusProba⚡</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button id="menu-trigger" class="menu-btn" aria-label="Menu">
+        ☰
+      </ion-button>
+
+      <ion-popover trigger="menu-trigger" side="bottom" alignment="end" [dismissOnSelect]="true">
+        <ng-template>
+          <app-menu-popover></app-menu-popover>
+        </ng-template>
+      </ion-popover>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [class.landing]="actionMode === 'home'" [class.inmode]="actionMode !== 'home'">
+  <!-- si home: rien d’autre que tes cartes existantes, ou un bloc discret -->
+  @if (actionMode !== 'home' && showLongPressHint) {
+    <div class="hint">
+      Maintenez <b>Simuler</b> appuyé pour lancer <b>10&nbsp;000</b> simulations.
+    </div>
+  }
+  <div class="ion-padding"> 
+    @if (actionMode === 'mintza' && partnerFixed) {
+      <div class="partner-row">
+        @for (id of j3Cards; track $index) {
+          <div class="partner-card" [style.backgroundImage]="'url(' + cardImageUrlFromFileId(id) + ')'"></div>
+        }
+      </div>
+    }
+  
+    @if (result) {
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Résumé</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p><strong>Itérations :</strong> {{ fmtInt(result.iterations) }}</p>
+        <!-- <p><strong>Durée :</strong> {{ fmtInt(result.duration_ms) }} ms</p> -->
+
+        @if (result.partenaire_fixe !== undefined) {
+          <p><strong>Partenaire fixé :</strong> {{ result.partenaire_fixe ? 'Oui' : 'Non' }}</p>
+        }
+
+        @if (result.display) {
+          <hr />
+          <div [innerHTML]="nl2br(result.display)"></div>
+        }
+      </ion-card-content>
+    </ion-card>
+    <!-- Détails : repliable -->
+    <ion-accordion-group value="">
+      <ion-accordion value="details">
+        <ion-item slot="header">
+          <ion-label>Détails</ion-label>
+        </ion-item>
+
+        <div slot="content" class="acc-content">
+          @for (b of blocks; track b.key) {
+            <ion-card>
+              <ion-card-header>
+                <ion-row class="ion-align-items-center">
+                  <ion-col size="5">
+                    <ion-card-title>{{ b.title }}</ion-card-title>
+                  </ion-col>
+
+                  <ion-col size="4" class="ion-text-center">
+                    @if (canUseConditional(b.key)) {
+                      <ion-checkbox
+                        [checked]="conditionalMode[b.key]"
+                        (ionChange)="conditionalMode[b.key] = $event.detail.checked">
+                        😭😉
+                      </ion-checkbox>
+                    }
+                  </ion-col>
+
+                  <ion-col size="3" class="ion-text-right">
+                    @if (b.key === 'grand' || b.key === 'petit') {
+                      <ion-button size="small" fill="outline"
+                        (click)="openEsperance(b.key)">
+                        🙏
+                      </ion-button>
+                    }
+                  </ion-col>
+                </ion-row>
+              </ion-card-header>
+
+              <ion-card-content>
+                @if (getStats(b.key)) {
+          <ion-grid>
+            @if (conditionalMode[b.key]) {
+              <div class="conditional-text">
+                Mon partenaire n'a pas mieux
+              </div>
+            }
+            <ion-row>
+              <ion-col size="6">
+                <p><strong>😁 Moi</strong></p>
+                <p>{{ fmtInt(getDisplayedStats(b.key)?.me) }} ({{ fmtPct(getDisplayedStats(b.key)?.me_pct) }})</p>
+              </ion-col>
+              <ion-col size="6">
+                <p><strong>🙂😉 Partenaire</strong></p>
+                <p>{{ fmtInt(getDisplayedStats(b.key)?.partner) }} ({{ fmtPct(getDisplayedStats(b.key)?.partner_pct) }})</p>
+              </ion-col>
+            </ion-row>
+
+            <ion-row>
+              <ion-col size="6">
+                <p><strong>👏 Égalité</strong></p>
+                <p>{{ fmtInt(getDisplayedStats(b.key)?.tie) }} ({{ fmtPct(getDisplayedStats(b.key)?.tie_pct) }})</p>
+              </ion-col>
+              <ion-col size="6">
+                <p><strong>😭 Perdu</strong></p>
+                <p>{{ fmtInt(getDisplayedStats(b.key)?.lose) }} ({{ fmtPct(getDisplayedStats(b.key)?.lose_pct) }})</p>
+              </ion-col>
+            </ion-row>
+          </ion-grid>
+        } @else {
+          <ion-text color="medium">Données manquantes.</ion-text>
+        }
+              </ion-card-content>
+            </ion-card>
+          }
+        </div>
+      </ion-accordion>
+    </ion-accordion-group>
+
+    <!-- Probabilités conditionnelles : thème vert -->
+    @if (result.adv_stats) {
+      <div class="cond-section">
+    <div class="cond-title">Probabilités conditionnelles</div>
+
+    <ion-card class="cond-card cond-paires">
+      <ion-card-header>
+        <ion-card-title>Paires</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <pre class="adv-text">{{ advPairesText }}</pre>
+          @if (canEstimatePaires){
+            <ion-button size="small" (click)="openAdvPaires()">Estimer</ion-button>
+          }
+
+          @if (pairesEstimateText) {
+            <pre class="json">{{ pairesEstimateText }}</pre>
+          }
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Jeu (texte jaune) -->
+      <ion-card class="cond-card cond-jeu">
+        <ion-card-header>
+        <ion-card-title>Jeu</ion-card-title>
+      </ion-card-header>
+        <ion-card-content>
+          <pre class="adv-text yellow">{{ advJeuText }}</pre>
+          <ion-button size="small" (click)="openAdvJeu()">Estimer</ion-button>
+            @if (showJeuHelp) {
+              <ion-button
+                size="small"
+                fill="clear"
+                aria-label="Pourquoi plusieurs estimations ?"
+                (click)="goJeuHelp()"
+              >
+                🚨
+              </ion-button>
+            }
+
+            @if (jeuEstimateText) {
+              <pre class="json yellow">{{ jeuEstimateText }}</pre>
+            }
+
+            @if (fauxJeuEstimateText) {
+              <pre class="json yellow">{{ fauxJeuEstimateText }}</pre>
+            }
+        </ion-card-content>
+      </ion-card>
+      <div class="cond-legend">cf : cas favorables | s : simulations</div>
+      </div>
+    }
+
+  @if (musResult && musResult.display && actionMode === 'mus') {
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Mus</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div [innerHTML]="nl2br(musDisplay)"></div>
+    </ion-card-content>
+  </ion-card>
+  }
+
+
+  }
+
+  @if (actionMode === 'mus') {
+    <div class="mus-runs">
+    @for (r of musRuns; track r.ts; let i = $index) {
+      <div class="mus-run">
+        <div class="mus-run-head">
+          <div class="mus-run-title">{{ r.title }}</div>
+          <button class="mus-run-close" type="button" (click)="removeMusRun(i)" aria-label="Supprimer">❌</button>
+        </div>
+
+        <pre class="mus-run-display">{{ r.display }}</pre>
+      </div>
+    }
+  </div>
+  }
+
+</div>
+  @if (musOverlayOpen) {
+    <div class="modal-backdrop" (click)="musOverlayOpen=false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">
+        <div class="modal-title">Nouvelle main</div>
+          <button class="modal-close" type="button" (click)="rerunMusFromOverlay()">🔁</button>
+        </div>
+
+        <div class="modal-hand">
+          @for (id of musNewHandCards; track $index) {
+            <div class="modal-card" [style.backgroundImage]="'url(' + cardImageUrlFromFileId(id) + ')'"></div>
+          }
+          </div>
+        </div>
+    </div>
+  }
+
+  @if (simOverlayOpen) {
+    <div class="modal-backdrop" (click)="simOverlayOpen=false">
+      <div class="modal sim-modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">
+          <div class="modal-title">Résultat</div>
+            <button class="modal-close" type="button" (click)="run(1)">🔁</button>
+          </div>
+
+        <!-- J3 en haut -->
+        @if (!partnerFixed) {
+          <div class="sim-top">
+            @for (id of simJ3Cards; track $index) {
+              <div class="mini-card" [style.backgroundImage]="'url(' + cardImageUrlFromFileId(id) + ')'"></div>
+            }
+          </div>
+        }
+
+        <div class="sim-body">
+          <!-- J2 à gauche (pile) -->
+          <div class="stack left">
+            @for (id of simJ2Cards; track $index) {
+              <div class="stack-card" [style.backgroundImage]="'url(' + cardImageUrlFromFileId(id) + ')'"></div>
+            }
+          </div>
+
+          <!-- centre : display -->
+          <div class="sim-center">
+            <pre class="sim-display">{{ simDisplay }}</pre>
+          </div>
+
+          <!-- J4 à droite (pile) -->
+          <div class="stack right">
+            @for (id of simJ4Cards; track $index) {
+              <div class="stack-card" [style.backgroundImage]="'url(' + cardImageUrlFromFileId(id) + ')'"></div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (errorMsg) {
+  <div class="error-banner">
+    {{ errorMsg }}
+  </div>
+}
+
+
+<div class="bottom-overlay" [class.input-open]="actionMode === 'home'">
+  @if (isComplete) {
+  <div class="action-bar">
+    @if (actionMode === 'home') {
+      <button class="action-btn" type="button" (click)="enterMus()">Mus</button>
+      <button class="action-btn" type="button" (click)="enterMintza()">Mintza</button>
+    }
+
+    @if (actionMode === 'mintza') {
+      <button class="action-btn primary"
+              type="button"
+              (pointerdown)="onSimDown()"
+              (pointerup)="onSimUp()"
+              (pointercancel)="onSimUp()">
+        Simuler
+      </button>
+
+      <button class="action-btn"
+        type="button"
+        [disabled]="simHasMultiRun"
+        (click)="choosePartnerHand()">
+        Choisir main partenaire
+      </button>
+
+      <button class="icon-btn" type="button" (click)="exitMode()" aria-label="Retour">🏠</button>
+    }
+
+    @if (actionMode === 'mus') {
+      <button class="action-btn primary"
+              type="button"
+              (pointerdown)="onSimDown()"
+              (pointerup)="onSimUp()"
+              (pointercancel)="onSimUp()">
+        Simuler
+      </button>
+
+      <button class="icon-btn" type="button" (click)="exitMode()" aria-label="Retour">🏠</button>
+    }
+  </div>
+}
+
+  <div class="hand-fan" aria-label="Cartes du joueur 1">
+    @for (id of handJ1Cards; track $index) {
+      <div
+  class="card"
+  [class.clickable]="actionMode === 'mus'"
+  [class.discarded]="isDiscarded($index)"
+  (click)="toggleDiscard($index)"
+  [attr.data-i]="$index"
+>
+  <div
+    class="card-inner"
+    [style.backgroundImage]="'url(' + cardImageUrlFromFileId(id) + ')'"
+  ></div>
+</div>
+    }
+  </div>
+
+@if (inputMode !== 'none') {
+    <div class="input-frame" [class.keypad-open]="inputMode === 'keypad'">
+      @if (inputMode === 'compact' && actionMode === 'home') {
+        <button class="pill" type="button" (click)="randomHand()">🎲</button>
+        <button class="pill center" type="button" (click)="openKeypad()">📱</button>
+        <button
+          class="pill"
+          type="button"
+          (click)="backspace()"
+          (pointerdown)="onEraseDown()"
+          (pointerup)="onEraseUp()"
+          (pointercancel)="onEraseUp()"
+          [disabled]="!hasAnyCard"
+          aria-label="Effacer"
+          >
+          ✏️
+        </button>
+      }
+
+      @if (inputMode === 'keypad') {
+    <button class="pill" type="button" (click)="closeKeypad()" aria-label="Fermer">❌</button>
+
+    <div class="keypad">
+      @for (k of keypadKeys; track k.label) {
+        <button class="key"
+                type="button"
+                (click)="tapKey(k.value)"
+                [disabled]="isKeypadFull">
+          {{ k.label }}
+        </button>
+      }
+    </div>
+
+    <button class="pill" type="button"
+            (click)="backspace()"
+            (pointerdown)="onEraseDown()"
+            (pointerup)="onEraseUp()"
+            (pointercancel)="onEraseUp()"
+            [disabled]="!hasAnyCardForTarget"
+            aria-label="Effacer">✏️</button>
+  }
+
+    </div>
+  }
+</div>
+</ion-content>
+

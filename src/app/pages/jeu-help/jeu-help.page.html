@@ -1,0 +1,96 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Cas rares</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Estimations multiples</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="info-section">
+        <ion-text class="info-p">
+          Je lance une simulation pour une probabilité conditionnelle sur le jeu avec un 36 dans mes mains 
+          (je ne précise pas la main de l'adversaire).<br>
+          J'obtiens ce résultat.
+        </ion-text>
+      </div>
+      <img class="help-img" src="assets/help/casrares2.png" alt="Cumul jeu - étape 1">
+
+      <div class="info-section">
+          <ion-text class="info-p">
+            Cela signifie que l'application a distribué 20 000 fois mais qu'elle 
+            n'a retenu que les 3 102 cas où un seul adversaire avait le jeu pour estimer la probabilité 
+            conditionnelle recherchée.<br>
+        </ion-text>
+      </div>
+      <div class="info-section">
+        <ion-text class="info-p">
+          <em>Notez que 3 102/20 000 = 0,1551<br>
+          à rapprocher du n=1|15,7%, juste au-dessus.</em><br>
+        </ion-text>
+        </div>
+        <div class="info-section">
+          <ion-text class="info-p">
+            Or, il faudrait que l'on ait 10 000 cas favorables pour avoir une précision de 1%.<br>
+            Vous avez la possibilité de relancer la simulation autant de fois que vous le souhaitez pour 
+            atteindre cet objectif. Les résultats se cumuleront.
+          </ion-text>
+        </div>
+        <img class="help-img" src="assets/help/casrares3.png" alt="Cumul jeu - étape 2">
+        <div class="info-section">
+          <ion-text class="info-p">
+            Ici, on voit qu'après 4 appuis successifs (4x20 000=80 000 simulations), l'objectif est atteint 
+            pour le cas "1 seul adversaire a le jeu". Cela est matérialisé par 🎌.<br>
+            Toutefois, même en faisant 10 fois plus de simulations pour le cas "les 2 adversaires ont le jeu", 
+            on n'est même pas encore à 3 000 cas favorables. C'est parce que ce cas est beaucoup plus rare.<br>
+          </ion-text>
+        </div>
+        <div class="info-section">
+          <ion-text class="info-p">
+            <em>Notez que 2 960/800 000 = 0,0037<br>
+            à rapprocher du n=2|0,3%, juste au-dessus.</em><br>
+          </ion-text>
+        </div>
+        <div class="info-section">
+          <ion-text class="info-p">
+            On peut continuer à lancer des simulations pour atteindre notre deuxième objectif. A partir de là, 
+            l'application lancera toujours 200 000 simulations pour le cas 2 mais seulement 1 pour le cas 1.
+          </ion-text>
+        </div>
+        
+        <img class="help-img" src="assets/help/casrares4.png" alt="Cumul jeu - étape 3">
+        
+        <div class="info-section">
+          <ion-text class="info-p">
+            Après 10 simulations supplémentaires (80 010 pour le cas 1), on atteint enfin notre objectif pour 
+            le cas 2 et on a des résultats précis à 1% près.<br>
+          </ion-text>
+        </div>
+
+            <div class="info-section">
+              <ion-text class="info-p">
+                Remarque : Si l'on compare avec les résultats obtenus dès la première simulation, on a pratiquement 
+                la même chose.<br>
+                De plus, on parle là, au moins pour le cas 2, de cas très rares (on est au premier 
+                tour, vous avez le jeu et vos 2 adversaires aussi).<br>
+                Il n'est donc pas très utile de connaître sa probabilité avec une précision extrême.<br>
+                Mais, cette application vous permet de l'avoir.
+              </ion-text>
+            </div>
+      
+    </ion-card-content>
+  </ion-card>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="footer-actions">
+      <ion-button expand="block" (click)="back()">
+        Retour
+      </ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>

@@ -1,0 +1,56 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Probabilités</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="ion-padding">
+    <ion-card>
+      <ion-card-content>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            Cet écran présente des calculs que j'avais réalisés il y a plusieurs années, sans simulations.
+          </ion-text>
+        </div>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            Exemple de calculs de probabilités d'avoir le jeu au premier tour avec des combinaisons :
+          </ion-text>
+          <img class="help-img-proba" src="assets/probas/proba1.png" alt="Probablités d'avoir le jeu">
+        </div>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            Bilan pour l'ensemble des jeux possibles :
+          </ion-text>
+          <img class="help-img-probas" src="assets/probas/proba2.png" alt="Tableau bilan jeux">  
+          <ion-text class="info-p">
+            La probabilité d'avoir 31 au premier tour n'est que de 3,3% mais c'est tout de même le jeu le plus fréquent.<br>
+            La probabilité d'avoir 31 sachant qu'on a le jeu est 25,9% soit 1 chance sur 4.
+          </ion-text>        
+        </div>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            Calculs pour le nombre de rois et pour les paires :
+          </ion-text>
+          <img class="help-img-probas" src="assets/probas/proba3.png" alt="Probablités d'avoir 2 rois oou des paires">
+        </div>
+
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="footer-actions">
+      <ion-button expand="block" (click)="back()">
+        Retour
+      </ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>

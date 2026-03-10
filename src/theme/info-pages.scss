@@ -1,0 +1,76 @@
+/* Styles communs pages info */
+ion-toolbar{
+  --background: #1f7a1f; /* vert */
+  text-align: left;
+  padding-left: 12px;
+}
+
+ion-title{
+  color: #ffd400;       /* jaune */
+  font-weight: 700;
+  text-align: left;
+  padding-left: 12px;
+}
+
+.info-section { margin-top: 16px; }
+
+.info-title h2 {
+  font-weight: 700;
+  font-size: 18px;
+  margin: 6px 0;
+}
+
+.info-title h3 {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 4px 0;
+}
+
+.info-p {
+  margin: 6px 0;
+  line-height: 1.4;
+}
+
+/* Puces */
+.info-bullets{
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.info-bullets li{
+  margin: 6px 0;
+}
+
+/* Images */
+.help-img{
+  width: 100%;
+  border-radius: 12px;
+  margin: 10px 0;
+  display: block;
+}
+
+.help-img-probas{
+  width: 100%;
+  margin: 10px 0;
+  display: block;
+}
+
+.help-img-small{
+  width: 50%;
+  border-radius: 5px;
+  margin: auto;
+  display: block;
+}
+
+ion-content.info-page .info-bullets{
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+ion-content.info-page .info-bullets li{
+  margin: 6px 0;
+}
+
+.footer-actions {
+  width: 100%;
+  padding: 0 12px;
+}

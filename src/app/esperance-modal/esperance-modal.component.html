@@ -1,0 +1,57 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Espérance - {{type}}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="modalCtrl.dismiss()">Fermer</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <p>
+  Mode :
+  @if (conditional) {
+    partenaire ≤ moi
+  } @else {
+    équipe
+  }
+  </p>
+
+<p>Probabilité de gagner : {{ p | percent:'1.0-1' }}</p>
+
+<ion-item>
+  <ion-label>Tira</ion-label>
+
+  <ion-button (click)="decTira()">-</ion-button>
+  <ion-label>{{tira}}</ion-label>
+  <ion-button (click)="incTira()">+</ion-button>
+</ion-item>
+
+<ion-item>
+  <ion-label>Iduki</ion-label>
+
+  <ion-button (click)="decIduki()">-</ion-button>
+  <ion-label>{{iduki}}</ion-label>
+  <ion-button (click)="incIduki()">+</ion-button>
+</ion-item>
+
+<ion-item>
+  <ion-label>
+    Espérance si je tiens : {{ eTenir | number:'1.2-2' }}
+  </ion-label>
+</ion-item>
+
+<ion-item>
+  <ion-label>
+    Espérance si je laisse : {{ eTirer | number:'1.2-2' }}
+  </ion-label>
+</ion-item>
+
+<ion-item>
+  <ion-label color="{{ decision ? 'success' : 'danger' }}">
+    {{ decision ? 'Tenir est préférable' : 'Laisser tirer est préférable' }}
+  </ion-label>
+</ion-item>
+
+</ion-content>

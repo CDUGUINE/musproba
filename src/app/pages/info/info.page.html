@@ -1,0 +1,86 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Mode d'emploi</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="ion-padding">
+    <ion-card>
+      <ion-card-content>
+
+    <ion-text class="info-p">
+      MusProba⚡estime des probabilités de gain (à 1% près) à l’aide de simulations répétées 10 000 fois.
+    </ion-text>
+
+    <div class="info-section">
+      <ion-text class="info-title"><h2>Mode Mus</h2></ion-text>
+      <ion-text class="info-p">
+        Estimez vos chances d’obtenir des paires ou le jeu en fonction des cartes que vous échangez.
+      </ion-text>
+    </div>
+
+    <div class="info-section">
+      <ion-text class="info-title"><h2>Mode Mintza</h2></ion-text>
+      <ion-text class="info-p">
+        Estimez vos probabilités de gain avec les cartes que vous avez au premier tour.
+      </ion-text>
+    </div>
+
+    <div class="info-section">
+      <ion-text class="info-title"><h3>Les émojis</h3></ion-text>
+      <ion-text class="info-p">
+        Qui a la meilleure main ?<br>
+        😁 : moi<br>
+        😀😉 : mon partenaire<br>
+        👏 : égalité (le joueur esku)<br>
+        😭 : les adversaires<br>
+      </ion-text>
+    </div>
+    <div class="info-section">
+      <ion-text class="info-title"><h3>Choisir main partenaire (optionnel)</h3></ion-text>
+      <ion-text class="info-p">
+        On peut connaitre les cartes de son partenaire :
+      </ion-text>
+      <ul class="info-bullets">
+        <li>en fin de manche, on peut les dévoiler pour décider où il vaut mieux donner</li>
+        <li>sur un pari, il peut être tentant de tenir au grand avec roi, 7. Si mon partenaire 
+          me dit qu'il a aussi un roi (mais pas mieux que moi), cela augmente mes chances ou les diminue ?</li>
+        <li>une fois les cartes retournées, pour voir si les probabilités nous auraient menés à d’autres choix.</li>
+      </ul>
+    </div>
+      <div class="info-section">
+        <ion-text class="info-title"><h3>Probabilités conditionnelles</h3></ion-text>
+          <ion-text class="info-p">
+            Mes cartes : 10 - 10 - 5 - 4
+          </ion-text>
+        <img class="help-img" src="assets/howto/resume.png" alt="Résumé">
+
+        <ion-text class="info-p">
+          Avec ces deux 10, on a 65% de chances de remporter les paires. Mais, si l’un de nos adversaires a des paires,
+          cette probabilité va diminuer (58%), et encore plus si les deux adversaires ont des paires (37%).
+        </ion-text>
+        
+        <img class="help-img" src="assets/howto/pairescond.png" alt="Probabilités conditionnelles paires">
+
+        <ion-text class="info-p">
+            Et cela, on le sait quand on commence à parier sur les paires.<br>
+            Il faut alors connaître la probabilité de gagner sachant qu’un adversaire, ou les deux, ont les paires.<br>
+            C’est ce que l’on appelle des probabilités conditionnelles (probabilité de A sachant B).
+        </ion-text>
+      </div>
+
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="footer-actions">
+      <ion-button expand="block" (click)="back()">
+        Retour
+      </ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>

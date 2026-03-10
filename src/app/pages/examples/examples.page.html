@@ -1,0 +1,66 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Exemple de scénario</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="ion-padding">
+    <ion-card>
+      <ion-card-content>
+        <div class="info-section">
+          <ion-text class="info-p">
+            On est en fin de manche. Il ne nous manque plus qu'un ttantto et les adversaires ne sont 
+            pas très loin.<br>
+            Ils vont faire hordago partout et il serait souhaitable de donner quelque part.<br>
+            Mon partenaire n'a pas grand-chose pour m'aider.<br>
+            Mes cartes pourraient me permettre de tenter ma chance mais je ne sais pas où.
+          </ion-text>
+          <img class="help-img" src="assets/examples/exemple1.png" alt="Résumé">
+          <ion-text class="info-p">
+            D'après le résumé, c'est aux paires que nous avons les meilleures chances avec 67%.<br>
+            Laissons donc le grand et le petit.
+          </ion-text>
+        </div>
+
+        <div class="info-section">
+          <img class="help-img" src="assets/examples/exemple2.png" alt="Probabilités conditionnelles paires">
+          <ion-text class="info-p">
+            Nous arrivons aux paires. S'ils n'en ont pas, nous gagnons à la fin du tour.<br>
+            S'ils ont une paire, nous n'avons plus que 57% de chance de gagner. C'est moins qu'au départ mais 
+            c'est encore mieux que les 55% du jeu/faux-jeu. Kanta !<br>
+            S'ils ont des paires tous les deux, nous n'avons plus que 30% de chances de gagner. Allons au jeu.<br>
+          </ion-text>
+        </div>
+
+        <div class="info-section">
+          <img class="help-img" src="assets/examples/exemple3.png" alt="Probabilités conditionnelles paires">
+          <ion-text class="info-p">
+            Si personne n'a le jeu, nos chances montent à 74%, plus 11% de cas d'égalité, qui s'ajoutent si je 
+            suis esku ou 5,5% si l'un des adversaires est esku sur moi, soit 85% ou 79,5%.<br>
+            Mieux vaut donner ici que de tenter un nouveau tour avec de nouvelles cartes, surtout si les adversaires
+            sont proches.
+          </ion-text>
+        </div>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            Maintenant, sur une partie, tout peut arriver. Ceci est une façon d'optimiser vos chances, pas de gagner à 
+            tous les coups.
+          </ion-text>
+        </div>
+
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="footer-actions">
+      <ion-button expand="block" (click)="back()">
+        Retour
+      </ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>

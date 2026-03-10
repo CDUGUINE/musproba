@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MusProba</string>
+    <string name="title_activity_main">MusProba</string>
+    <string name="package_name">com.exampleapple.Hello</string>
+    <string name="custom_url_scheme">com.exampleapple.Hello</string>
+</resources>

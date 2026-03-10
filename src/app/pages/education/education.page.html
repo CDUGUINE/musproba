@@ -1,0 +1,60 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Éducation</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="ion-padding">
+    <ion-card>
+      <ion-card-content>
+        <div class="info-section">
+          <ion-text class="info-p">
+            La notion de probabilité est abordée dès le collège. Les probabilités conditionnelles sont étudiées au lycée.
+          </ion-text>
+        </div>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            La version 1 de l’application a été développée avec App Inventor, très proche de Scratch qui est enseigné 
+            au collège. Ces deux outils sont développés par le prestigieux MIT. 
+          </ion-text>
+          <img class="help-img-small" src="assets/education/appinv.png" alt="Logo App Inventor">
+          <img class="help-img" src="assets/education/appinvecran.jpg" alt="Ecran App Inventor">
+        </div>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            Pour la version 2, j’ai ajouté une API (Application Programming Interface) codée en Python, langage enseigné 
+            au lycée. Cela permet de rendre les simulations, sur l’API en ligne, quasi instantanées alors qu’elles 
+            nécessitaient plusieurs minutes sur l’appareil dans la version 1.
+          </ion-text>
+          <img class="help-img" src="assets/education/apimusproba.jpg" alt="API Python">
+          <img class="help-img" src="assets/education/codepython.png" alt="Codage Python">
+
+        </div>
+
+        <div class="info-section">
+          <ion-text class="info-p">
+            Dans la version 3, j’ai remplacé App Inventor par un véritable outil professionnel, Ionic avec le framework 
+            Angular. C'est plus technique, ça nécessite d’apprendre le codage, mais ça offre des possibilités infinies 
+            dans la personnalisation de l’application.
+          </ion-text>
+          <img class="help-img-small" src="assets/education/ionic.png" alt="Ionic + Angular">
+          <img class="help-img" src="assets/education/codage.png" alt="Codage ts">
+        </div>
+
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="footer-actions">
+      <ion-button expand="block" (click)="back()">
+        Retour
+      </ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>
