@@ -9,11 +9,6 @@
   <div class="ion-padding">
     <ion-card>
       <ion-card-content>
-        <div class="info-section">
-          <ion-text class="info-p">
-            Cette version intermédiaire introduit les premiers calculs d’espérance mathématique, pour le grand et le petit seulement.
-          </ion-text>
-        </div>
 
         <div class="info-section">
           <ion-text class="info-p">
@@ -30,23 +25,26 @@
             supposer que ses cartes sont bonnes (à moins que ce soit du bluff) et donc qu’il faut tenir avec plus de prudence que ce que 
             l’application conseille. A partir de là, c’est de la psychologie plus que des mathématiques, mais il est toujours bon de connaître la valeur de sa main.<br>
             Mais s’il fait son pari sans regarder ses cartes (biak imido direct par exemple) ou qu’il est contraint d’emporter le pari pour ne pas vous laisser 
-            gagner, l’aléatoire et les calculs reprennent leurs droits. 
+            gagner, l’aléatoire et les calculs reprennent leurs droits. <br>
+            Dans le cas des paires et du jeu, ces calculs sont particulièrement intéressants car les joueurs sont plus tentés de lancer un pari pour remporter 
+            les points qui s'ajoutent à ce pari. Le bluff est donc plus courant et il faut parfois tenir, même si la probabilité de victoire est inférieure à 50%.
           </ion-text>
         </div>
 
         <div class="info-section">
           <ion-text class="info-p">
-            <ion-text class="info-title"><h2>L’option « mon adversaire n’a pas mieux que moi »</h2></ion-text>
+            <ion-text class="info-title"><h2>L’option « mon partenaire n’a pas mieux que moi »</h2></ion-text>
             </ion-text>
           <ion-text class="info-p">
-            Nouveauté intéressante dans cette version, lorsque votre probabilité de gain est supérieure à 20%, vous pouvez cocher la case 😭😉qui apparait dans 
-            le détail des résultats.<br>J’hésite à tenir au grand avec roi-7.<br>L’application me dit que j’ai 45,67% de chances de gagner mais je peux ajouter les 18,54%
-             de chances de mon partenaire, ce qui fait 64,21% de chances pour notre équipe de l’emporter.<br>Mais souvent, on ne prend pas cette décision seul et, si le
+            Lorsque votre probabilité de gain est supérieure à 20%, vous pouvez cocher la case 😭😉 qui apparait à côté du bouton d'espérance.<br> 
+            J’hésite à tenir au grand avec roi-7.<br>L’application me dit que j’ai 45,56% de chances de gagner mais je peux ajouter les 18,14% 
+            de chances de mon partenaire, ce qui fait 63,7% de chances pour notre équipe de l’emporter.<br>Mais souvent, on ne prend pas cette décision seul et, si le
               partenaire a mieux, c’est lui qui décide de tenir ou de faire monter la mise.<br>Si l’on a un dialogue du type « roi-7 », « pas mieux » on le traduit en 
-              cochant la case. On voit alors que le partenaire ne gagne plus et que notre probabilité réelle est de 58,09%, meilleure qu’au départ mais moins bonne 
-              que pour l’équipe. 
+              cochant la case. On voit alors que le partenaire ne gagne plus et que notre probabilité réelle est de 57,73%, meilleure qu’au départ mais moins bonne 
+              que pour l’équipe.<br>
+              Il est généralement préférable de cocher cette case. Faire un calcul d'espérance pour savoir si je dois tenir avec mon 37 n'a pas de sens si mon partenaire a 32.<br>  
           </ion-text>
-          <img class="help-img" src="assets/esperance/esperance12.jpg" alt="Coche partenaire">
+          <img class="help-img" src="assets/esperance/esperance1.jpg" alt="Coche partenaire">
         </div>
 
         <div class="info-section">
@@ -54,11 +52,18 @@
             On peut alors, avec ou sans cette information, lancer le...
           </ion-text>
           <ion-text class="info-title"><h2>calcul de l’espérance🙏</h2></ion-text>
-          <img class="help-img" src="assets/esperance/esperance34.jpg" alt="Calcul esperance">
+
+          <img class="help-img" src="assets/esperance/esperance2.jpg" alt="Calcul esperance">
 
           <ion-text class="info-p">
-            Ici, dans les 2 cas, il est préférable de tenir.<br>Même si l’espérance de tenir était négative, il serait conseillé de tenir tant que cette espérance est 
-            supérieure à celle de laisser.<br>
+            J'ai 37 au jeu, nos 2 adversaires ont le jeu et je suis saku. Ma probabilité de victoire n'est que de 14% et j'ai pourtant intérêt à tenir car, 
+            en cas de victoire, les points que je prends et ceux qu'ils ne prennent pas font la différence.<br>
+          </ion-text>
+
+          <img class="help-img" src="assets/esperance/esperance3.jpg" alt="Calcul esperance">
+
+          <ion-text class="info-p">
+            Sauf si le pari est de 3 (hiru imido).<br>
           </ion-text>
         </div>
 
@@ -67,8 +72,8 @@
             <strong>Remarques</strong><br>
             <ul class="info-bullets">
               <li>On peut modifier les valeurs avec les touches bleues pour obtenir l’espérance associée au pari engagé.<br></li>
-              <li>La probabilité de gagner est légèrement supérieure à la somme de la nôtre et de celle de notre partenaire car on ajoute la moitié des cas d’égalité 
-              (dépend du joueur esku).</li>
+              <li>Pour un pari moins risqué, on obtiendra une espérance de tenir positive, celle pour laisser tirer sera toujours négative 
+                (on est sûr de perdre des points) et, tant qu'elle est inférieure à l'espérance de tenir, le pari mérite d'être tenu.</li>
             </ul>
           </ion-text>
 

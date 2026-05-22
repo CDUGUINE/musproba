@@ -3,7 +3,7 @@ import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http
 import { Observable, throwError } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { Simul1Request, Simul1Response, MusRequest, SimCondBetDoubleRequest, SimFauxJeuRequest, SimCondBetDoubleResponse, SimFauxJeuResponse } from '../../shared/models/simulation.models';
+import { Simul1Request, Simul1Response, MusRequest, SimCondBetDoubleRequest, SimFauxJeuRequest, SimCondBetDoubleResponse, SimFauxJeuResponse, SimCondBetDoubleFilteredRequest, SimFauxJeuFilteredRequest, SimFauxJeuFilteredResponse } from '../../shared/models/simulation.models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -26,6 +26,8 @@ export class ApiService {
   const url = `${this.baseUrl}/simulate_complete_hand`; // ⚠️ adapte si ton endpoint s'appelle autrement
   const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
+
+  
   return this.http.post<Simul1Response>(url, payload, { headers }).pipe(
     timeout(this.timeoutMs),
     catchError((err) => this.mapError(err))
@@ -68,13 +70,23 @@ export class ApiService {
   }
 
   simulateCondBetDouble(body: SimCondBetDoubleRequest) {
-  return this.http.post<SimCondBetDoubleResponse>(`${this.baseUrl}/simulate_cond_bet_double`, body);
-}
+    return this.http.post<SimCondBetDoubleResponse>(`${this.baseUrl}/simulate_cond_bet_double`, body);
+  }
 
-simulateFauxJeu(body: SimFauxJeuRequest) {
-  return this.http.post<SimFauxJeuResponse>(`${this.baseUrl}/simulate_faux_jeu`, body);
-}
+  simulateFauxJeu(body: SimFauxJeuRequest) {
+    return this.http.post<SimFauxJeuResponse>(`${this.baseUrl}/simulate_faux_jeu`, body);
+  }
 
+  simulateCondBetDoubleFiltered(body: SimCondBetDoubleFilteredRequest) {
+    return this.http.post<any>(
+      `${this.baseUrl}/simulateCondBetDoubleFiltered`,
+      body
+    );
+  }
+
+  simulateFauxJeuFiltered(body: SimFauxJeuFilteredRequest) {
+    return this.http.post<SimFauxJeuFilteredResponse>(`${this.baseUrl}/simulatefauxjeufiltered`, body);
+  }
 }
 
 

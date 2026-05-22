@@ -1,6 +1,6 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Espérance - {{type}}</ion-title>
+    <ion-title>{{modalTitle}}</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="modalCtrl.dismiss()">Fermer</ion-button>
     </ion-buttons>
@@ -17,41 +17,128 @@
     équipe
   }
   </p>
+  @if (tieContext && pTie > 0) {
+    @if (tieContext.partnerHasJeu || isFauxJeu) {
+      @if (tieContext.partnerFixed) {
+        <p>
+          {{ tieContext.formConfig.intro2 }}
+        </p>
+      } @else {
+        <p>
+          {{ tieContext.formConfig.intro1 }}
+        </p>
+      }
+    }
+    <p>
+      {{ tieContext.formConfig.question }}
+    </p>
+    <ion-segment
+      [value]="selectedTieStrategy"
+      (ionChange)="onTieStrategyChange($event)"
+    >
+    @if (tieContext.formConfig.showEsku) {
+      <ion-segment-button
+        [value]="TieStrategy.ESKU">
+        <ion-label>Esku</ion-label>
+      </ion-segment-button>
+    }
+    @if (tieContext.formConfig.showMilieu) {
+      <ion-segment-button
+        [value]="TieStrategy.MILIEU">
+        <ion-label>Milieu</ion-label>
+      </ion-segment-button>
+    }
+    @if (tieContext.formConfig.showSaku) {
+      <ion-segment-button
+        [value]="TieStrategy.SAKU">
+        <ion-label>Saku</ion-label>
+      </ion-segment-button>
+    }
+    </ion-segment>
+  }
+  <p>Probabilité de gagner : {{ effectivePWin | percent:'1.0-1' }}</p>
 
-<p>Probabilité de gagner : {{ p | percent:'1.0-1' }}</p>
+  <ion-item>
+    <ion-label>Tira</ion-label>
 
-<ion-item>
-  <ion-label>Tira</ion-label>
+    <ion-button (click)="decTira()">-</ion-button>
+    <ion-label>{{tira}}</ion-label>
+    <ion-button (click)="incTira()">+</ion-button>
+  </ion-item>
 
-  <ion-button (click)="decTira()">-</ion-button>
-  <ion-label>{{tira}}</ion-label>
-  <ion-button (click)="incTira()">+</ion-button>
-</ion-item>
+  <ion-item>
+    <ion-label>Iduki</ion-label>
 
-<ion-item>
-  <ion-label>Iduki</ion-label>
+    <ion-button (click)="decIduki()">-</ion-button>
+    <ion-label>{{iduki}}</ion-label>
+    <ion-button (click)="incIduki()">+</ion-button>
+  </ion-item>
 
-  <ion-button (click)="decIduki()">-</ion-button>
-  <ion-label>{{iduki}}</ion-label>
-  <ion-button (click)="incIduki()">+</ion-button>
-</ion-item>
+  <ion-item>
+    <ion-label>
+      @if (isExtendedMode) {
+        <div class="ev-block">
+          <div class="ev-title" style="margin-bottom:12px;">
+            Espérance
+            @if (showPointsEV) {
+              = pari + points
+            }
+          </div>
+        si je tiens :
+        {{ evPariTenir | number:'1.2-2' }}
+        @if (showPointsEV) {
+          +
+          {{ evPointsTenir | number:'1.2-2' }}
+        }
+        =
+        <b>
+          {{
+            showPointsEV
+              ? (eTenirTotal | number:'1.2-2')
+              : (evPariTenir | number:'1.2-2')
+          }}
+        </b>
+        </div>
+      } @else {
+        Espérance si je tiens : {{ evPariTenir | number:'1.2-2' }}
+      }
 
-<ion-item>
-  <ion-label>
-    Espérance si je tiens : {{ eTenir | number:'1.2-2' }}
-  </ion-label>
-</ion-item>
+    </ion-label>
+  </ion-item>
 
-<ion-item>
-  <ion-label>
-    Espérance si je laisse : {{ eTirer | number:'1.2-2' }}
-  </ion-label>
-</ion-item>
+  <ion-item>
+    <ion-label>
 
-<ion-item>
-  <ion-label color="{{ decision ? 'success' : 'danger' }}">
-    {{ decision ? 'Tenir est préférable' : 'Laisser tirer est préférable' }}
-  </ion-label>
-</ion-item>
+      @if (isExtendedMode) {
+        si je laisse :
+        {{ evPariTirer | number:'1.2-2' }}
+        @if (showPointsEV) {
+          +
+          {{ evPointsTirer | number:'1.2-2' }}
+        }
+        =
+        <b>
+          {{
+            showPointsEV
+              ? (eTirerTotal | number:'1.2-2')
+              : (evPariTirer | number:'1.2-2')
+          }}
+        </b>
+      } @else {
+        Espérance si je laisse : {{ evPariTirer | number:'1.2-2' }}
+      }
+
+    </ion-label>
+  </ion-item>
+
+  <ion-item>
+    <ion-label color="{{ isExtendedMode ? (decisionTotal ? 'success' : 'danger') : (decision ? 'success' : 'danger') }}">
+      @if (isExtendedMode) {
+        {{ decisionTotal ? 'Tenir est préférable' : 'Laisser tirer est préférable' }}
+      } @else {
+        {{ decision ? 'Tenir est préférable' : 'Laisser tirer est préférable' }}
+      }
+    </ion-label>
+  </ion-item>
 
 </ion-content>

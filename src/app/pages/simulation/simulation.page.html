@@ -33,13 +33,19 @@
     }
   
     @if (result) {
+      <ion-segment
+        [value]="mode"
+        (ionChange)="onModeChange($event)">
+        <ion-segment-button value="start">Début</ion-segment-button>
+        <ion-segment-button value="bet">Pari</ion-segment-button>
+      </ion-segment>
+
     <ion-card>
       <ion-card-header>
         <ion-card-title>Résumé</ion-card-title>
       </ion-card-header>
       <ion-card-content>
         <p><strong>Itérations :</strong> {{ fmtInt(result.iterations) }}</p>
-        <!-- <p><strong>Durée :</strong> {{ fmtInt(result.duration_ms) }} ms</p> -->
 
         @if (result.partenaire_fixe !== undefined) {
           <p><strong>Partenaire fixé :</strong> {{ result.partenaire_fixe ? 'Oui' : 'Non' }}</p>
@@ -52,15 +58,93 @@
       </ion-card-content>
     </ion-card>
     <!-- Détails : repliable -->
-    <ion-accordion-group value="">
-      <ion-accordion value="details">
-        <ion-item slot="header">
-          <ion-label>Détails</ion-label>
-        </ion-item>
+      @if (mode === 'start') {
 
-        <div slot="content" class="acc-content">
+        <!-- START : accordéon -->
+        <ion-accordion-group value="">
+          <ion-accordion value="details">
+
+            <ion-item slot="header">
+              <ion-label>Détails</ion-label>
+            </ion-item>
+
+            <div slot="content" class="acc-content">
+              @for (b of blocks; track b.key) {
+                <ion-card>
+                  <ion-card-header>
+                    <ion-row class="ion-align-items-center">
+                      <ion-col size="12">
+                        <ion-card-title>{{ b.title }}</ion-card-title>
+                      </ion-col>
+                    </ion-row>
+                  </ion-card-header>
+
+                  <ion-card-content>
+
+                    @if (getStats(b.key)) {
+
+                      <ion-grid>
+
+                        <ion-row>
+                          <ion-col size="6">
+                            <p><strong>😁 Moi</strong></p>
+                            <p>
+                              {{ fmtInt(getDisplayedStats(b.key)?.me) }}
+                              ({{ fmtPct(getDisplayedStats(b.key)?.me_pct) }})
+                            </p>
+                          </ion-col>
+
+                          <ion-col size="6">
+                            <p><strong>🙂😉 Partenaire</strong></p>
+                            <p>
+                              {{ fmtInt(getDisplayedStats(b.key)?.partner) }}
+                              ({{ fmtPct(getDisplayedStats(b.key)?.partner_pct) }})
+                            </p>
+                          </ion-col>
+                        </ion-row>
+
+                        <ion-row>
+                          <ion-col size="6">
+                            <p><strong>👏 Égalité</strong></p>
+                            <p>
+                              {{ fmtInt(getDisplayedStats(b.key)?.tie) }}
+                              ({{ fmtPct(getDisplayedStats(b.key)?.tie_pct) }})
+                            </p>
+                          </ion-col>
+
+                          <ion-col size="6">
+                            <p><strong>😭 Perdu</strong></p>
+                            <p>
+                              {{ fmtInt(getDisplayedStats(b.key)?.lose) }}
+                              ({{ fmtPct(getDisplayedStats(b.key)?.lose_pct) }})
+                            </p>
+                          </ion-col>
+                        </ion-row>
+
+                      </ion-grid>
+
+                    } @else {
+
+                      <ion-text color="medium">
+                        Données manquantes.
+                      </ion-text>
+
+                    }
+
+                  </ion-card-content>
+                </ion-card>
+              }
+            </div>
+
+          </ion-accordion>
+        </ion-accordion-group>
+
+      } @else {
+
+        <!-- BET : toujours ouvert -->
+        <div class="acc-content">
           @for (b of blocks; track b.key) {
-            <ion-card>
+            <ion-card class="bet-mode">
               <ion-card-header>
                 <ion-row class="ion-align-items-center">
                   <ion-col size="5">
@@ -68,20 +152,23 @@
                   </ion-col>
 
                   <ion-col size="4" class="ion-text-center">
-                    @if (canUseConditional(b.key)) {
+                    @if (canUseConditional(b.key) && canComputeEV(b.key)) {
                       <ion-checkbox
                         [checked]="conditionalMode[b.key]"
-                        (ionChange)="conditionalMode[b.key] = $event.detail.checked">
+                        (ionChange)="onConditionalToggle(b.key, $event.detail.checked)">
                         😭😉
                       </ion-checkbox>
                     }
                   </ion-col>
 
                   <ion-col size="3" class="ion-text-right">
-                    @if (b.key === 'grand' || b.key === 'petit') {
-                      <ion-button size="small" fill="outline"
-                        (click)="openEsperance(b.key)">
-                        🙏
+                    @if (canComputeEV(b.key)) {
+                      <ion-button
+                        size="small"
+                        fill="outline"
+                        [disabled]="isButtonDisabled(b.key)"
+                        (click)="onMainButtonClick(b.key)">
+                        {{ getButtonIcon(b.key) }}
                       </ion-button>
                     }
                   </ion-col>
@@ -89,13 +176,115 @@
               </ion-card-header>
 
               <ion-card-content>
-                @if (getStats(b.key)) {
-          <ion-grid>
-            @if (conditionalMode[b.key]) {
-              <div class="conditional-text">
-                Mon partenaire n'a pas mieux
-              </div>
-            }
+
+      @if (getStats(b.key)) {
+        <ion-grid>
+          @if (
+            ((b.key === 'paires' && hasMyPairs()) ||
+              (b.key === 'jeu' && hasMyJeu())) &&
+            conditionalMode[b.key] && canComputeEV(b.key)
+          ) {
+            <div class="conditional-text">
+              Mon partenaire n'a pas mieux
+            </div>
+          } 
+
+          @if (partnerFixed && (b.key === 'paires' || b.key === 'jeu')) {
+            <div class="conditional-text">
+              {{ getPartnerText(b.key) }}
+            </div>
+          }
+
+          @if (
+            (b.key === 'paires' || b.key === 'jeu') &&
+            !canShowAdvSegment(b.key)
+          ) {
+            <div class="conditional-text">
+              @if (b.key === 'jeu' && betConfig.advHasJeu === 0) {
+                Faux jeu
+              } @else {
+                Pas de {{ b.key }} → pas de pari
+              }
+            </div>
+          }
+
+          @if (b.key === 'paires' || b.key === 'jeu') {
+            @if ((b.key === 'paires' || b.key === 'jeu') && canShowAdvSegment(b.key)) {
+                <ion-segment
+                  [value]="
+                    (b.key === 'paires'
+                      ? betConfig.advHasPairs
+                      : betConfig.advHasJeu
+                    )?.toString()
+                  "
+                  (ionChange)="
+                    b.key === 'paires'
+                      ? setAdvPairs($any($event.detail.value))
+                      : setAdvJeu($any($event.detail.value))
+                  ">
+
+                  <ion-segment-button value="0">Aucun</ion-segment-button>
+                  <ion-segment-button value="1">1 adv</ion-segment-button>
+                  <ion-segment-button value="2">2 adv</ion-segment-button>
+
+                </ion-segment>
+
+                <!-- 🔵 MESSAGE JEU (source unique) -->
+                @if (b.key === 'jeu' && getJeuMessage()) {
+                  <div class="conditional-text">
+                    {{ getJeuMessage() }}
+                  </div>
+                }
+
+                <!-- 🔵 MESSAGE PAIRES -->
+                @if (b.key === 'paires' && betConfig.advHasPairs === 0) {
+                  <div class="conditional-text">
+                    Aucun adversaire → pas de pari
+                  </div>
+                }
+
+                @if (b.key === 'paires' && conditionalMode['paires'] && betConfig.partnerHasPairs === true &&
+                  getMyPairsInfo().bestPair < (betConfig.advHasPairs === 1 ? 4 : 6) && !getMyPairsInfo().isDoublePair &&
+                  !getMyPairsInfo().hasMedes) {
+                  <div class="conditional-text">
+                    ⚠️ Probabilité de victoire trop faible.
+                    L'espérance est peu pertinente.
+                  </div>
+                }
+
+        <!-- 🔵 PARTENAIRE (switch ou info) -->
+        @if (!partnerFixed &&
+          ((b.key === 'paires' && betConfig.advHasPairs !== 0) ||
+            (b.key === 'jeu' && betConfig.advHasJeu !== 0))
+        ) {
+          <ion-item lines="none" class="switchround">
+            <div class="conditional-text">
+              {{
+                (b.key === 'jeu' ? betConfig.partnerHasJeu : betConfig.partnerHasPairs)
+                  ? (b.key === 'jeu'
+                      ? "Partenaire a le jeu"
+                      : "Partenaire a des paires")
+                  : (b.key === 'jeu'
+                      ? "Partenaire n'a pas le jeu"
+                      : "Partenaire n'a pas de paires")
+              }}
+            </div>
+
+            <ion-toggle
+              slot="end"
+              [checked]="
+                b.key === 'jeu'
+                  ? betConfig.partnerHasJeu === true
+                  : betConfig.partnerHasPairs === true
+              "
+              (ionChange)="onPartnerToggle($event.detail.checked, b.key)">
+            </ion-toggle>
+          </ion-item>
+          }
+        }
+      }
+
+          @if (b.key === 'grand' || b.key === 'petit') {
             <ion-row>
               <ion-col size="6">
                 <p><strong>😁 Moi</strong></p>
@@ -117,19 +306,92 @@
                 <p>{{ fmtInt(getDisplayedStats(b.key)?.lose) }} ({{ fmtPct(getDisplayedStats(b.key)?.lose_pct) }})</p>
               </ion-col>
             </ion-row>
-          </ion-grid>
-        } @else {
-          <ion-text color="medium">Données manquantes.</ion-text>
-        }
-              </ion-card-content>
-            </ion-card>
           }
-        </div>
-      </ion-accordion>
-    </ion-accordion-group>
+
+          @if (b.key === 'paires' && condState.paires.done) {
+            <div class="conditional-text">
+              {{ betPairesEstimateText }}
+            </div>
+          }
+
+          @if (b.key === 'jeu' && condState.jeu.count > 0) {
+            <div class="conditional-text">
+              {{ betJeuEstimateText || betFauxJeuEstimateText }}
+            </div>
+            
+            @if (rareCaseMessage || errorText) {
+              <div class="rare-box">
+
+                @if (rareCaseMessage) {
+                  <div class="rare-text">
+                    {{ rareCaseMessage }}
+                  </div>
+                }
+
+                @if (errorText) {
+                  <div class="rare-error">
+                    {{ errorText }}
+                  </div>
+                }
+
+                @if (showAutoRunButton && !autoRunning) {
+                    <div class="rare-actions">
+                    <ion-button size="small" (click)="startAutoRun('jeu')">
+                      Lancer x10
+                    </ion-button>
+
+                    <ion-button size="small" fill="clear" (click)="cancelRareCase()">
+                      Annuler
+                    </ion-button>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (autoRunning) {
+              <div class="progress-container">
+                <div
+                  class="progress-bar"
+                  [style.width.%]="((autoStep - 1) / autoTotal) * 100">
+                </div>
+              </div>
+            }
+          }
+        </ion-grid>
+      }
+    </ion-card-content>
+
+  </ion-card>
+
+    }
+
+  </div>
+
+}
+
+      <ion-accordion-group value="">
+        <ion-accordion value="details">
+          <div slot="content" class="acc-content">
+            @for (b of blocks; track b.key) {
+              <ion-card [class.bet-mode]="mode === 'bet'">
+                <ion-card-header>
+                  <ion-row class="ion-align-items-center">
+                    <ion-col size="5">
+                      <ion-card-title>{{ b.title }}</ion-card-title>
+                    </ion-col>
+                  </ion-row>
+                </ion-card-header>
+
+                <ion-card-content>
+                </ion-card-content>
+              </ion-card>
+            }
+          </div>
+        </ion-accordion>
+      </ion-accordion-group>
 
     <!-- Probabilités conditionnelles : thème vert -->
-    @if (result.adv_stats) {
+    @if (result.adv_stats && mode === 'start') {
       <div class="cond-section">
     <div class="cond-title">Probabilités conditionnelles</div>
 

@@ -1,0 +1,29 @@
+.ev-block {
+  margin-top: 10px;
+}
+
+.ev-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.ev-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.ev-detail {
+  opacity: 0.8;
+}
+
+.ev-total {
+  font-weight: bold;
+}
+
+.ev-note {
+  font-size: 0.85em;
+  color: #888;
+  margin-left: 6px;
+}

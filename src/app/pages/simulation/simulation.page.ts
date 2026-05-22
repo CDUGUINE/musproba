@@ -1,11 +1,11 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ModalController, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonText, IonGrid, IonRow, IonCol, IonHeader, IonTitle, IonButton, IonAccordionGroup, IonItem, IonAccordion, IonLabel, IonButtons, IonPopover, IonCheckbox, IonToolbar } from '@ionic/angular/standalone';
+import { ModalController, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonText, IonGrid, IonRow, IonCol, IonHeader, IonTitle, IonButton, IonToggle, IonAccordionGroup, IonItem, IonAccordion, IonLabel, IonButtons, IonPopover, IonCheckbox, IonToolbar, IonSegment, IonSegmentButton } from '@ionic/angular/standalone';
 import { ApiService } from '../../core/http/api.service';
-import { Simul1Response, BlockKey, OutcomeStats, MusResponse, SimCondBetDoubleRequest } from '../../shared/models/simulation.models';
+import { Simul1Response, BlockKey, OutcomeStats, MusResponse, SimCondBetDoubleRequest, TieStrategy, TieFormType } from '../../shared/models/simulation.models';
 import { Router } from '@angular/router';
-import type { AdvKey, CondAdv } from '../../shared/models/simulation.models';
+import type { AdvKey, BetConfig, CondAdv, JeuTieContext, JeuTieContextBase, SimCondBetDoubleFilteredRequest, SimFauxJeuFilteredResponse, TieDecision, TieFormConfig, TieResolutionAnswers } from '../../shared/models/simulation.models';
 import { PopoverController } from '@ionic/angular';
 import { MenuPopoverComponent } from '../../shared/menu-popover.component';
 import { inject } from '@angular/core';
@@ -15,7 +15,7 @@ import { EsperanceModalComponent } from '../../esperance-modal/esperance-modal.c
 @Component({
   standalone: true,
   selector: 'app-simulation',
-  imports: [
+  imports: [IonSegmentButton, IonSegment, 
   CommonModule,
   ReactiveFormsModule,
 
@@ -34,6 +34,7 @@ import { EsperanceModalComponent } from '../../esperance-modal/esperance-modal.c
   IonCol,
 
   IonButton,
+  IonToggle,
   IonCheckbox,
   IonToolbar,
 
@@ -53,27 +54,160 @@ import { EsperanceModalComponent } from '../../esperance-modal/esperance-modal.c
 })
 
 export class SimulationPage {
-openEsperance(type: BlockKey) {
+  private requestIds = {
+    paires: 0,
+    jeu: 0
+  };
 
+openEsperance(type: BlockKey) {
   const p = this.getProbability(type);
+  const isFauxJeu = type === 'jeu' && !this.teamHasJeu(this.result);
+
+  let stats: any = null;
+  let pWin = 0;
+  let pMe = 0;
+  let pPartner = 0;
+  let pTie = 0;
+  let pLose = 0;
+  let avgTeamPointsWin = 0;
+  let avgOppLose = 0;
+  let avgOppAll = 0;
+
+  if (type === 'jeu') {
+    if (isFauxJeu) {
+      stats = this.lastFauxJeuResult;
+    } else {
+      const adv = this.betConfig.advHasJeu;
+      stats = this.jeuAcc[adv === 1 ? 'adv1' : 'adv2'];
+    }
+
+  } else if (type === 'paires') {
+    stats = this.lastPairesResult;
+
+  } else {
+    stats = this.getStats(type);
+  }
+
+  if (stats) {
+    // ===== FAUX-JEU =====
+    if (isFauxJeu) {
+      pMe = (stats.me_pct ?? 0) / 100;
+      pPartner = (stats.partner_pct ?? 0) / 100;
+      pTie = (stats.tie_pct ?? 0) / 100;
+      pLose = (stats.lose_pct ?? 0) / 100;
+
+      pWin =
+        (
+          (stats.me_pct ?? 0) +
+          (stats.partner_pct ?? 0) +
+          0.5 * (stats.tie_pct ?? 0)
+        ) / 100;
+
+    // ===== JEU ACCUMULATION =====
+
+    } else
+    if (type === 'jeu' && !isFauxJeu) {
+      // 🔴 cas accumulation (jeu)
+      pMe = stats.matched_trials > 0
+          ? stats.me / stats.matched_trials
+          : 0;
+      pPartner = stats.matched_trials > 0
+          ? stats.partner / stats.matched_trials
+          : 0;
+      pLose = stats.matched_trials > 0
+          ? stats.lose / stats.matched_trials
+          :0;
+      pTie = stats.matched_trials >0
+          ? stats.tie / stats.matched_trials
+          :0;
+
+      pWin = stats.matched_trials > 0
+          ? (stats.me + stats.partner + 0.5 * stats.tie) / stats.matched_trials
+          : 0;
+
+      avgTeamPointsWin = stats.team_win_count > 0
+        ? stats.team_points_sum /stats.team_win_count
+        : 0;
+
+      avgOppLose = stats.opp_lose_count > 0
+          ? stats.opp_points_lose_sum / stats.opp_lose_count
+          : 0;
+
+      avgOppAll = stats.opp_all_count > 0
+          ? stats.opp_points_all_sum / stats.opp_all_count
+          : 0;
+
+      stats.avg_team_points_win = avgTeamPointsWin;
+      stats.avg_opp_points_lose = avgOppLose;
+      stats.avg_opp_points_all = avgOppAll;
+
+    } else {
+      // 🔴 cas API directe (paires / grand)
+      pMe = (stats.me_pct ?? 0) / 100;
+      pPartner = (stats.partner_pct ?? 0) / 100;
+      pLose = (stats.lose_pct ?? 0) / 100;
+      pTie = (stats.tie_pct ?? 0) / 100;
+
+      pWin =
+        ((stats.me_pct ?? 0) +
+         (stats.partner_pct ?? 0) +
+         0.5 * (stats.tie_pct ?? 0)) / 100;
+
+      if (type === 'paires') {
+        avgTeamPointsWin = stats.avg_team_points_win ?? 0;
+        avgOppLose = stats.avg_opp_points_lose ?? 0;
+        avgOppAll = stats.avg_opp_points_all ?? 0;
+      }
+    }
+  }
+
+  let myPoints = 0;
+
+  if (type === 'paires') {
+    myPoints = this.getMyPairsPoints();
+  }
+
+  if (type === 'jeu') {
+    myPoints = this.getMyJeuPoints();
+  }
+
+  if (type === 'jeu') {
+    this.tieContext = isFauxJeu
+        ? this.buildFauxJeuTieContext()
+        : this.buildTieContext('jeu');
+  } else if (type === 'paires') {
+    this.tieContext = this.buildTieContext('paires');
+  } else {
+    this.tieContext = null;
+  }
 
   this.modalCtrl.create({
     component: EsperanceModalComponent,
     componentProps: {
+      pWin,
+      pMe,
+      pPartner,
+      pLose,
+      pTie,
+      myPoints,
+      stats: stats,
       type: type,
-      p: p,
-      conditional: this.conditionalMode[type]
+      conditional: this.conditionalMode[type],
+      tieContext: this.tieContext,
+      selectedTieStrategy: this.selectedTieStrategy,
+      isFauxJeu
     }
   }).then(modal => modal.present());
-
 }
-  showLongPressHint = true;
+
+showLongPressHint = true;
+
 goJeuHelp() {
   this.router.navigateByUrl('/jeu-help');
 }
 
-  n1Simul = 20000;
-  n2Simul = 200000;
+n1Simul = 20000;
+n2Simul = 200000;
 
 openAdvJeu() {
   const base = this.buildPayload(1);
@@ -86,8 +220,15 @@ openAdvJeu() {
     this.fauxJeuEstimateText = 'Calculs en cours…';
 
     this.api.simulateFauxJeu(body).subscribe({
-      next: (r: any) => { this.fauxJeuEstimateText = (r?.display ?? '').toString(); },
-      error: (err: any) => { console.error(err); this.fauxJeuEstimateText = 'Erreur API'; }
+      next: (r: any) => {
+        this.fauxJeuEstimateText = (r?.display ?? '').toString();
+        this.condState.jeu.loading = false; // 🔴 manquant
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.fauxJeuEstimateText = 'Erreur API';
+        this.condState.jeu.loading = false; // 🔴 manquant
+      }
     });
     return;
   }
@@ -104,8 +245,11 @@ openAdvJeu() {
 
   this.api.simulateCondBetDouble(body).subscribe({
     next: (r: any) => {
+      // accumulation affichage
       this.addToJeuAcc('adv1', r?.results?.adv1);
       this.addToJeuAcc('adv2', r?.results?.adv2);
+
+      // affichage
       this.jeuEstimateText = this.rebuildJeuDisplayDouble();
     },
     error: (err: any) => {
@@ -151,9 +295,39 @@ estimerDisplayJeu = '';
 estimerLastRequest: unknown = null;
 estimerLastResponse: unknown = null;
 
+// MODE DÉBUT
 pairesEstimateText = '';  // ce que renvoie simulate_cond_bet_double pour bet=paires
 jeuEstimateText = '';     // texte cumulé du jeu (display reconstruit)
 fauxJeuEstimateText = ''; // display de simulate_faux_jeu (si tu l’affiches plus tard)
+
+// MODE PARI
+betPairesEstimateText = '';
+betJeuEstimateText = '';
+betFauxJeuEstimateText = '';
+
+autoRunning = false;
+autoDone = false;
+hasCheckedRareCase = false;
+autoStep = 0;
+autoTotal = 10;
+myPoints = 1 | 2 | 3;
+
+rareCaseMessage: string | null = null;
+showAutoRunButton = false;
+
+errorText: string | null = null;
+lastPairesResult: any = null;
+lastFauxJeuResult: SimFauxJeuFilteredResponse | null = null;
+selectedTieStrategy: TieStrategy = TieStrategy.MILIEU;
+
+isFauxJeu =false;
+
+private jeuAcc: Record<AdvKey, CondAdv> = {
+  adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0, 
+    team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+  adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0, 
+    team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+};
 
 choosePartnerHand() {
   this.partnerFixed = true;
@@ -173,6 +347,581 @@ choosePartnerHand() {
   inputTarget: 'j1' | 'j3' = 'j1';          // <- qui est en train de saisir au clavier
   partnerFixed = false;                     // <- j3 fixé ou simulé
 
+  mode: 'start' | 'bet' = 'start';
+
+  startResult: Simul1Response | null = null;
+
+  condState = {
+    paires: { loading: false, done: false },
+    jeu: { loading: false, count: 0, target: 4000 }
+  };
+
+  betConfig: BetConfig = {
+  partnerHasPairs: false,
+  partnerHasJeu: false,
+
+  advHasPairs: null,
+  advHasJeu: null,
+
+  partnerLeqMe: false
+};
+
+  betStats = {
+    adv1: null,
+    adv2: null,
+  };
+
+  betAccum = {
+    adv1: { winPoints: 0, winCount: 0, losePoints: 0, loseCount: 0, matched: 0 },
+    adv2: { winPoints: 0, winCount: 0, losePoints: 0, loseCount: 0, matched: 0 },
+  };
+
+  isBetType(type: BlockKey): type is 'paires' | 'jeu' {
+    return type === 'paires' || type === 'jeu';
+  }
+
+  isReadyForEV(type: BlockKey): boolean {
+    if (type === 'grand' || type === 'petit') return true;
+    // if (this.partnerFixed) return true;
+
+    if (type === 'paires') {
+      return this.condState.paires.done;
+    }
+
+    if (type === 'jeu') {
+      return this.condState.jeu.count >= this.condState.jeu.target;
+    }
+
+    return false;
+  }
+
+  isButtonDisabled(type: BlockKey): boolean {
+    if (type === 'grand' || type === 'petit') return false;
+
+    const s = this.condState[type];
+
+    return s.loading || this.autoRunning;
+  }
+
+  getButtonIcon(type: BlockKey): string {
+    if (type === 'grand' || type === 'petit') return '🙏';
+
+    if (type === 'paires') {
+      const s = this.condState.paires;
+      if (s.loading) return '⏳';
+      return s.done ? '🙏' : '🎲';
+    }
+
+    if (type === 'jeu') {
+      const s = this.condState.jeu;
+
+      if (s.loading) return '⏳';
+      if (this.autoRunning) return '⏳';
+      if (this.isReadyForEV(type)) return '🙏';
+      // if (this.autoDone) return '🙏';
+
+      const adv = this.betConfig.advHasJeu;
+
+      const teamHasJeu =
+        this.hasMyJeu() ||
+        (this.partnerFixed
+          ? this.hasPartnerJeuReal()
+          : this.betConfig.partnerHasJeu === true);
+
+      // if (this.isReadyForEV('jeu')) { return '🙏';}
+      return '🎲';
+    }
+
+    return '🎲';
+  }
+
+  onMainButtonClick(type: BlockKey) {
+    if (type === 'grand' || type === 'petit') {
+      this.openEsperance(type);
+      return;
+    }
+
+    if (type === 'paires') {
+      if (this.condState.paires.done) {
+        this.openEsperance(type);
+      } else {
+        this.runBetPaires();
+      }
+      return;
+    }
+
+    if (type === 'jeu') {
+      if (this.condState.jeu.count >= this.condState.jeu.target || this.autoDone) {
+        this.openEsperance(type);
+      } else {
+        this.runBetJeu();
+      }
+      return;
+    }
+  }
+
+  runConditionalSimulation(type: BlockKey): Promise<void> {
+  const requestId = ++this.requestIds.jeu;  
+  const base = this.buildPayload(1);
+  if (!base) return Promise.resolve();
+
+  const isCond = this.conditionalMode[type];
+  const iterAdv1 = this.betConfig.partnerHasJeu ? 500000 : 50000;
+
+  const body: SimCondBetDoubleFilteredRequest = {
+    hand_j1: base.hand_j1,
+    hand_j3: base.hand_j3,
+
+    bet: type as any,
+
+    partner_has_jeu: this.partnerFixed
+      ? undefined
+      : this.betConfig.partnerHasJeu,
+
+    no_better: isCond,
+
+    iterations_adv1: this.jeuAdvDone.adv1 ? 1 : iterAdv1,
+    iterations_adv2: this.jeuAdvDone.adv2 ? 1 : 1000000,
+  };
+
+  this.condState.jeu.loading = true;
+
+  return new Promise((resolve, reject) => {
+    this.api.simulateCondBetDoubleFiltered(body).subscribe({
+      next: (r: any) => {
+        if (requestId !== this.requestIds.jeu) {
+          return;
+        }
+        
+        this.condState.jeu.loading = false;
+        const adv = this.betConfig.advHasJeu;
+
+        if (adv === 1) {
+          this.addToJeuAcc('adv1', r?.results?.adv1);
+          this.condState.jeu.count += r?.results?.adv1?.matched_trials ?? 0;
+        }
+
+        if (adv === 2) {
+          this.addToJeuAcc('adv2', r?.results?.adv2);
+          this.condState.jeu.count += r?.results?.adv2?.matched_trials ?? 0;
+        }
+
+        this.betJeuEstimateText = this.rebuildJeuDisplaySingle();
+
+        // 🔴 TEST ICI (après accumulation)
+        const res = adv === 1 ? r?.results?.adv1 : r?.results?.adv2;
+
+        const cf = this.condState.jeu.count;
+        const winPct = (res?.me_pct ?? 0) + (res?.partner_pct ?? 0);
+
+        // 🔴 1. CALCUL ERREUR (toujours)
+        if (cf > 0) {
+          const p = winPct / 100;
+          const n = cf;
+
+          const probError = 1.96 * Math.sqrt((p * (1 - p)) / n);
+
+          const amplitude = 4;
+          const evError = probError * amplitude;
+
+          this.errorText =
+            `Incertitude : ±${(probError * 100).toFixed(1)}%` +
+            ` (🙏 ±${evError.toFixed(2)})`;
+        } else {
+          this.errorText = null;
+        }
+
+        if (!this.autoRunning && !this.hasCheckedRareCase && !this.autoDone) {
+          this.hasCheckedRareCase = true;
+
+          if (cf < 1000) {
+
+            if (winPct < 20) {
+              this.rareCaseMessage =
+                "⚠️ Probabilité de victoire trop faible. L'espérance est peu pertinente.";
+              this.showAutoRunButton = false;
+
+            } else {
+              this.rareCaseMessage =
+                "Cas rare : peu de cas favorables.\nVoulez-vous lancer des simulations supplémentaires ?";
+              this.showAutoRunButton = true;
+            }
+          }
+        }
+        resolve();
+      },
+      error: (err) => {
+        reject(err);
+      }
+    });
+
+  });
+}
+
+startAutoRun(type: BlockKey) {
+  this.showAutoRunButton = false;
+  this.rareCaseMessage = null;
+  this.autoRun(type);
+}
+
+cancelRareCase() {
+  this.rareCaseMessage = null;
+}
+
+  enterBetMode() {
+    this.mode = 'bet';
+
+    if (this.betConfig.partnerHasPairs === null) {
+      this.betConfig.partnerHasPairs = false;
+    }
+
+    if (this.betConfig.partnerHasJeu === null) {
+      this.betConfig.partnerHasJeu = false;
+    }
+
+    // 🔴 important : on repart propre
+    this.condState.paires.done = false;
+    this.condState.jeu.count = 0;
+  }
+
+  hasPartnerReal(type: BlockKey): boolean {
+    return type === 'paires'
+      ? this.hasPartnerPairsReal()
+      : this.hasPartnerJeuReal();
+  }
+
+  hasMy(type: BlockKey): boolean {
+    return type === 'paires'
+      ? this.hasMyPairs()
+      : this.hasMyJeu();
+  }
+
+  public hasPartnerPairsReal(): boolean {
+  if (!this.partnerFixed || !this.j3Cards) return false;
+
+  // convertir id carte (1..40) → rang (1..10)
+  const ranks = this.j3Cards.map(c => ((c - 1) % 10) + 1);
+
+  const counts: Record<number, number> = {};
+
+  for (const r of ranks) {
+    counts[r] = (counts[r] || 0) + 1;
+    if (counts[r] >= 2) return true;
+  }
+
+  return false;
+  }
+
+  // ✔ version UI (cartes connues)
+  public hasPartnerJeuReal(): boolean {
+  if (!this.partnerFixed) return false;
+
+  const values = this.handJ3Values; // ⬅️ IMPORTANT
+  if (!values || values.length === 0) return false;
+
+  const score = values.reduce((sum, v) => sum + v, 0);
+  return score > 30;
+  }
+
+  canShowAdvSegment(type: BlockKey): boolean {
+    if (type === 'paires') {
+      return this.hasMyPairs() || this.hasPartnerPairsReal();
+    }
+
+    if (type === 'jeu') {
+
+      const teamHasJeu =
+        this.hasMyJeu() ||
+        (this.partnerFixed
+          ? this.hasPartnerJeuReal()
+          : this.betConfig.partnerHasJeu === true);
+
+      return teamHasJeu; // 🔴 correction clé
+    }
+
+    return false;
+  }
+
+  canComputeEV(type: BlockKey): boolean {
+
+  // GRAND / PETIT
+  if (type === 'grand' || type === 'petit') {
+    return true;
+  }
+
+  // PAIRES
+  if (type === 'paires') {
+    const adv = this.betConfig.advHasPairs;
+
+    if (adv === null || adv === 0) return false;
+
+    // 🔴 NOUVELLE RÈGLE
+    const info = this.getMyPairsInfo();
+
+    const threshold = adv === 1 ? 4 : 6;
+
+    if (
+      this.conditionalMode['paires'] &&
+      this.betConfig.partnerHasPairs === true &&
+      !info.hasMedes &&
+      !info.isDoublePair &&
+      info.bestPair < threshold
+    ) {
+      return false;
+    }
+
+    // 🔴 IMPORTANT : ne pas bloquer si partenaire inconnu
+    if (this.partnerFixed) {
+      if (!this.hasMyPairs() && !this.hasPartnerPairsReal()) return false;
+    } else {
+      if (!this.hasMyPairs() && this.betConfig.partnerHasPairs !== true) return false;
+    }
+
+    return true;
+  }
+
+  // JEU
+  if (type === 'jeu') {
+    const adv = this.betConfig.advHasJeu;
+
+    if (adv === null) return false;
+
+    let teamHasJeu: boolean;
+
+    if (this.partnerFixed) {
+      teamHasJeu = this.hasMyJeu() || this.hasPartnerJeuReal();
+    } else {
+      teamHasJeu = this.hasMyJeu() || this.betConfig.partnerHasJeu === true;
+    }
+
+    // faux jeu autorisé
+    if (!teamHasJeu && adv === 0) return true;
+
+    // incohérences
+    if (!teamHasJeu && adv > 0) return false;
+    if (teamHasJeu && adv === 0) return false;
+
+    return true;
+  }
+
+  return false;
+}
+
+  getJeuMessage(): string | null {
+
+    const adv = this.betConfig.advHasJeu;
+    if (adv === null) return null;
+
+    const teamHasJeu =
+      this.hasMyJeu() ||
+      (this.partnerFixed
+        ? this.hasPartnerJeuReal()
+        : this.betConfig.partnerHasJeu === true);
+
+    const advHasJeu = adv > 0;
+
+    // ❌ aucun adversaire
+    if (adv === 0) {
+      if (teamHasJeu) {
+        return "Aucun adversaire n’a le jeu → pas de pari";
+      } else {
+        return "Faux jeu";
+      }
+    }
+
+    // ❌ mismatch
+    if (teamHasJeu && !advHasJeu) {
+      return "Aucun adversaire n’a le jeu → pas de pari";
+    }
+
+    if (!teamHasJeu && advHasJeu) {
+      return "Vos adversaires ont le jeu → pas de pari";
+    }
+
+    // ⚠️ partenaire inconnu
+    if (
+      !this.partnerFixed &&
+      !this.hasMyJeu() &&
+      this.betConfig.partnerHasJeu === true
+    ) {
+      return "Calcul impossible : aucune donnée sur le jeu du partenaire";
+    }
+
+    // ✔ faux-jeu vs faux-jeu → PAS de message bloquant
+    if (!teamHasJeu && !advHasJeu) {
+      return null;
+    }
+
+    return null;
+  }
+
+  setAdvPairs(value: any) {
+    const v = Number(value);
+
+    if (v === 0 || v === 1 || v === 2) {
+
+      this.betConfig.advHasPairs = v as 0 | 1 | 2;
+
+      if (v === 0) {
+        this.betConfig.partnerHasPairs = false;
+        this.conditionalMode['paires'] = false;
+      }
+
+      if(this.condState.paires.loading) {
+        this.requestIds.paires++;
+      }
+      this.resetPaires();
+    }
+  }
+
+  setAdvJeu(value: any) {
+    const v = Number(value);
+
+    if (v === 0 || v === 1 || v === 2) {
+
+      this.betConfig.advHasJeu = v as 0 | 1 | 2;
+
+      if (v === 0) {
+        this.betConfig.partnerHasJeu = false;
+        this.conditionalMode['jeu'] = false;
+      }
+
+      if(this.condState.jeu.loading) {
+        this.requestIds.jeu++;
+      }
+      this.resetJeu();
+    }
+  }
+
+  resetBetData() {
+    this.betStats = { adv1: null, adv2: null };
+
+    this.betAccum = {
+      adv1: { winPoints: 0, winCount: 0, losePoints: 0, loseCount: 0, matched: 0 },
+      adv2: { winPoints: 0, winCount: 0, losePoints: 0, loseCount: 0, matched: 0 },
+    };
+  }
+
+  resetBetState() {
+    // --- PAIRES ---
+    this.condState.paires = {
+      done: false,
+      loading: false
+    };
+    this.betPairesEstimateText = '';
+    this.betConfig.partnerHasPairs = false;
+    this.conditionalMode['paires'] = false;
+
+    // --- JEU ---
+    this.condState.jeu = {
+      count: 0,
+      target: 4000,
+      loading: false
+    };
+    this.betJeuEstimateText = '';
+    this.betFauxJeuEstimateText = '';
+    this.betConfig.partnerHasJeu = false;
+    this.conditionalMode['jeu'] = false;
+
+    // cumul jeu
+    this.resetJeuAcc();
+
+    this.jeuAdvDone = {
+      adv1: false,
+      adv2: false
+    };
+  }
+
+  resetPaires() {
+    this.condState.paires.done = false;
+    this.condState.paires.loading = false;
+    this.betPairesEstimateText = '';
+  }
+
+  resetJeu() {
+    this.condState.jeu.count = 0;
+    this.condState.jeu.loading = false;
+
+    this.betJeuEstimateText = '';
+    this.betFauxJeuEstimateText = '';
+
+    this.autoDone = false;
+    this.autoRunning = false;
+    this.autoStep = 0;
+
+    this.resetJeuAcc(); // 🔴 TRÈS IMPORTANT
+  }
+
+  resetJeuAcc() {
+    this.jeuAcc = {
+      adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0,
+        team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+      adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0,
+        team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+    };
+  }
+  
+  onModeChange(event: any) {
+    const value = event?.detail?.value;
+
+    if (value === 'start' || value === 'bet') {
+      this.mode = value;
+
+      // IMPORTANT pour ton switch
+          if (value === 'bet') {
+        this.betConfig = {
+          ...this.betConfig,
+          advHasPairs: this.betConfig.advHasPairs ?? 0,
+          advHasJeu: this.betConfig.advHasJeu ?? 0,
+        };
+      }
+    }
+  }
+
+  onPartnerToggle(value: boolean, type: BlockKey) {
+    if (type === 'paires') {
+    this.betConfig.partnerHasPairs = value;
+
+    if (!value) {
+      this.conditionalMode['paires'] = false;
+    }
+
+    if(this.condState.paires.loading) {
+      this.requestIds.paires++;
+      }
+    this.resetPaires();
+  }
+
+  if (type === 'jeu') {
+    this.betConfig.partnerHasJeu = value;
+
+    if (!value) {
+      this.conditionalMode['jeu'] = false;
+    }
+
+    if(this.condState.jeu.loading) {
+    this.requestIds.jeu++;
+    }
+    this.resetJeu();
+  }
+}
+
+  setMode(ev: any) {
+  const value = ev?.detail?.value;
+
+  if (value === 'start' || value === 'bet') {
+    this.mode = value;
+
+    if (value === 'bet' && this.betConfig.partnerHasPairs === null) {
+      this.betConfig.partnerHasPairs = false;
+    }
+
+    if (value === 'bet' && this.betConfig.partnerHasJeu === null) {
+      this.betConfig.partnerHasJeu = false;
+    }
+  }
+}
+
   conditionalMode: Record<BlockKey, boolean> = {
     grand: false,
     petit: false,
@@ -180,9 +929,6 @@ choosePartnerHand() {
     jeu: false
   };
   
-  // conditionalMode = false;
-  // canUseConditional = false;
-
   j3Cards: number[] = [];                   // fileId 1..40 affichés en haut (si choisi)
 
   simOverlayOpen = false;
@@ -222,7 +968,6 @@ get handJ1(): number[] {
   const v = this.form.getRawValue();
   return [Number(v.j1_0), Number(v.j1_1), Number(v.j1_2), Number(v.j1_3)];
 }
-
 
 constructor(private fb: FormBuilder, private api: ApiService, private router: Router, private modalCtrl: ModalController) {
   this.clearAll();
@@ -282,16 +1027,16 @@ exitMode() {
   this.fauxJeuEstimateText = '';
 
   // Cumul jeu
-  this.jeuAcc = {
-    adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0 },
-    adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0 },
-  };
+  this.resetJeuAcc();
   this.jeuAdvDone = { adv1: false, adv2: false };
+
+  // Paris
+  this.resetBetState();
 
   // 6) selections/états UI
   this.discardIndexes?.clear?.();
 
-// 7) reset checkbox "partenaire pas mieux"
+  // 7) reset checkbox "partenaire pas mieux"
   this.resetConditionalModes();
 
   // 8) IMPORTANT : on conserve J1 (valeurs + cartes)
@@ -307,8 +1052,30 @@ resetConditionalModes() {
   };
 }
 
+onConditionalToggle(type: BlockKey, value: boolean) {
+  this.conditionalMode[type] = value;
 
-  run(iterations: number) {
+  if (type === 'jeu') {
+    if(this.condState.jeu.loading) {
+      this.requestIds.jeu++;
+    }
+    this.resetJeu();
+  }
+
+  if (type === 'paires') {
+    if(this.condState.paires.loading) {
+      this.requestIds.paires++;
+    }
+    this.resetPaires();
+  }
+
+  // optionnel mais propre :
+  if (type === 'grand' || type === 'petit') {
+    // pas de reset API, juste recalcul affichage
+  }
+}
+
+run(iterations: number) {
   if (iterations >= 10000) this.showLongPressHint = false;
   this.errorMsg = null;
   // this.result = null;
@@ -335,7 +1102,9 @@ resetConditionalModes() {
 
   // MULTI : on affiche sur l'écran (tes ion-card "blocks") et on sort
   if (iterations >= 10000) {
-    this.result = r;              // ou this.simResult = r, selon ce que ton HTML utilise
+    this.mode = 'start';
+    this.resetBetConfig();
+    this.result = r;
     this.simOverlayOpen = false;
     this.simHasMultiRun = true;   // pour désactiver “Choisir main partenaire” si tu veux
     this.resetConditionalModes();
@@ -365,6 +1134,16 @@ resetConditionalModes() {
       this.errorMsg = e.message || 'Erreur.';
     }
   });
+}
+
+resetBetConfig() {
+  this.betConfig = {
+    advHasPairs: null,
+    advHasJeu: null,
+    partnerHasPairs: false,
+    partnerHasJeu: false,
+    partnerLeqMe: false
+  };
 }
 
 runMus(iterations: number): void {
@@ -455,6 +1234,164 @@ this.musOverlayOpen = true;            // ou overlayNewHandVisible = true selon 
   });
 }
 
+runBetPaires() {
+  const requestId = ++this.requestIds.paires;
+  const base = this.buildPayload(1);
+  if (!base) return;
+  const isCond = this.conditionalMode['paires'];
+  const base1 = 60000;
+  const base2 = 160000;
+
+  const iterations_adv1 = isCond ? base1 * 3 : base1;
+  const iterations_adv2 = isCond ? base2 * 2 : base2;
+
+  const body = {
+    hand_j1: base.hand_j1,
+    hand_j3: base.hand_j3,
+    bet: 'paires' as const,
+
+    partner_has_pairs: this.partnerFixed
+      ? undefined
+      : (this.betConfig.partnerHasPairs ?? false),
+
+    no_better: isCond,
+
+    iterations_adv1,
+    iterations_adv2,
+  };
+
+  this.condState.paires.loading = true;
+  this.condState.paires.done = false;
+
+  this.api.simulateCondBetDoubleFiltered(body).subscribe({
+
+    next: (r: any) => {
+
+      // requête obsolète
+      if (requestId !== this.requestIds.paires) {
+        return;
+      }
+
+      const adv = this.betConfig.advHasPairs;
+      const result = adv === 1 ? r.results.adv1 : r.results.adv2;
+
+      this.lastPairesResult = result;
+
+      if (adv === 1) {
+        this.betPairesEstimateText =
+          (r?.results?.adv1?.display ?? '')
+            .replace(/^Contre.*?:\s*/, '');
+      } else if (adv === 2) {
+        this.betPairesEstimateText =
+          (r?.results?.adv2?.display ?? '')
+            .replace(/^Contre.*?:\s*/, '');
+      }
+
+      this.condState.paires.loading = false;
+      this.condState.paires.done = true;
+    },
+
+    error: (err: any) => {
+
+      // requête obsolète
+      if (requestId !== this.requestIds.paires) {
+        return;
+      }
+
+      console.error(err);
+
+      this.betPairesEstimateText = 'Erreur API';
+      this.condState.paires.loading = false;
+    }
+  });
+}
+
+runBetJeu() {
+  this.hasCheckedRareCase = false;
+  this.autoRunning = false;
+  this.condState.jeu.loading = true;
+  this.rareCaseMessage = null;
+  this.showAutoRunButton = false;
+  this.errorText = null;
+  
+  const base = this.buildPayload(1);
+  if (!base) return;
+
+  const hasJeu = this.teamHasJeu(this.result);
+
+  // 🔴 CAS FAUX JEU
+  if (!hasJeu) {
+
+    const body = {
+      iterations: 100000,
+      hand_j1: base.hand_j1,
+      hand_j3: base.hand_j3,
+      no_better: this.conditionalMode['jeu'] === true
+    };
+
+    this.betFauxJeuEstimateText = 'Calculs en cours…';
+
+    this.api.simulateFauxJeuFiltered(body).subscribe({
+      next: (r: any) => {
+        const display = (r?.display ?? '').toString();
+        const matched = r?.matched_trials ?? 0;
+        const iterations = r?.iterations ?? 0;
+        this.condState.jeu.count = matched;
+        const suffix =`\n(${matched.toLocaleString('fr-FR')} cf/${iterations.toLocaleString('fr-FR')} s)`;
+
+        const winPct = (r?.me_pct ?? 0) + (r?.partner_pct ?? 0);
+
+        // const result = r.results;
+        this.lastFauxJeuResult = r;
+
+
+        if (winPct < 1) {
+          this.betFauxJeuEstimateText +=
+            "\n⚠️ Aucune chance réaliste de gagner.\nL'espérance est inutile.";
+        }
+        // this. = winPct < 1;
+
+        this.betFauxJeuEstimateText = display + suffix;
+        this.condState.jeu.loading = false;
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.betFauxJeuEstimateText = 'Erreur API';
+      }
+    });
+
+    return;
+  }
+
+  // ✅ CAS NORMAL (jeu)
+  this.runConditionalSimulation('jeu');
+}
+
+async showRareCasePrompt(type: BlockKey) {
+  const ok = confirm(
+    "Cas très rare.\n\nVoulez-vous lancer automatiquement 9 simulations supplémentaires pour affiner l'estimation ?"
+  );
+
+  if (ok) {
+    await this.autoRun(type);
+  }
+}
+
+async autoRun(type: BlockKey) {
+  this.autoRunning = true;
+  this.autoDone = false;
+
+  this.autoStep = 1; // déjà 1er run fait
+
+  for (let i = 0; i < 9; i++) {
+    this.autoStep = i + 2; // 2 → 10
+    await this.runConditionalSimulation(type);
+  }
+
+  this.autoRunning = false;
+  this.autoDone = true;
+}
+
 removeMusRun(i: number) {
   this.musRuns.splice(i, 1);
   // si tu utilises OnPush :
@@ -485,8 +1422,43 @@ private fmtPct1(n: number | undefined | null): string {
   return `${n.toFixed(1).replace(".", ",")}%`;
 }
 
+public hasMyPairs(): boolean {
+  const cards = this.handJ1Cards;
+  if (!cards || cards.length === 0) return false;
+
+  // convertir en rang 1..10 (mais sans fusion figures)
+  const ranks = cards.map(c => ((c - 1) % 10) + 1);
+
+  const counts: Record<number, number> = {};
+
+  for (const r of ranks) {
+    counts[r] = (counts[r] || 0) + 1;
+    if (counts[r] >= 2) return true;
+  }
+
+  return false;
+}
+
+private hasPartnerPairs(r: any): boolean {
+  if (!this.partnerFixed) return false;
+  return (r?.paires_j3 ?? 0) > 0;
+}
+
 private teamHasPaires(r: any): boolean {
   return (r?.paires_j1 ?? 0) > 0 || (this.partnerFixed && (r?.paires_j3 ?? 0) > 0);
+}
+
+public hasMyJeu(): boolean {
+  const values = this.handJ1Values;
+  if (!values || values.length === 0) return false;
+
+  const score = values.reduce((sum, v) => sum + v, 0);
+  return score > 30;
+}
+
+private hasPartnerJeu(r: any): boolean {
+  if (!this.partnerFixed) return false;
+  return (r?.jeu_j3 ?? 0) > 30;
 }
 
 private teamHasJeu(r: any): boolean {
@@ -637,25 +1609,88 @@ get isComplete(): boolean {
   return this.selectedValues.length === 4;
 }
 
+getAdv(type: BlockKey): 0 | 1 | 2 | null {
+  return type === 'paires'
+    ? this.betConfig.advHasPairs
+    : this.betConfig.advHasJeu;
+}
+
+getPartnerText(type: BlockKey): string {
+  const has = this.hasPartnerReal(type);
+
+  if (type === 'jeu') {
+    return has ? "Partenaire a le jeu" : "Partenaire n'a pas le jeu";
+  }
+
+  return has ? "Partenaire a des paires" : "Partenaire n'a pas de paires";
+}
+
 getProbability(type: BlockKey): number {
 
+  const tieAlpha =
+    this.strategyToAlpha(
+      this.selectedTieStrategy
+    );
+
+  // 🔴 PAIRES
+  if (
+    type === 'paires' &&
+    this.lastPairesResult
+  ) {
+
+    const r = this.lastPairesResult;
+
+    return (
+      (r.me_pct ?? 0) +
+      (r.partner_pct ?? 0) +
+      (r.tie_pct ?? 0) * tieAlpha
+    ) / 100;
+  }
+
+  // 🔴 JEU / FAUX-JEU
+  if (type === 'jeu') {
+    const isFauxJeu = !this.teamHasJeu(this.result);
+
+    // ===== FAUX-JEU =====
+    if (isFauxJeu) {
+      const r = this.lastFauxJeuResult;
+      if (!r) return 0;
+
+      return (
+        (r.me_pct ?? 0) +
+        (r.partner_pct ?? 0) +
+        (r.tie_pct ?? 0) * tieAlpha
+      ) / 100;
+    }
+
+    // ===== JEU NORMAL =====
+    const adv = this.betConfig.advHasJeu;
+    const stats = this.jeuAcc[adv === 1 ? 'adv1' : 'adv2'];
+    if (!stats || stats.matched_trials === 0) {
+      return 0;
+    }
+
+    return (
+      stats.me +
+      stats.partner +
+      tieAlpha * stats.tie
+    ) / stats.matched_trials;
+  }
+
+  // 🔵 GRAND / PETIT
   const stats = this.getStats(type)!;
-
   if (!this.conditionalMode[type]) {
-
     return (
       stats.me_pct +
       stats.partner_pct +
-      stats.tie_pct * 0.5
+      stats.tie_pct * tieAlpha
     ) / 100;
-
   }
 
   return (
     (stats.cond_me_pct ?? 0) +
-    (stats.cond_tie_pct ?? 0) * 0.5
+    (stats.cond_tie_pct ?? 0) * tieAlpha
   ) / 100;
-
 }
 
 getDisplayedStats(type: BlockKey) {
@@ -687,44 +1722,77 @@ getDisplayedStats(type: BlockKey) {
 
 }
 
+getBetStats(type: BlockKey) {
+
+  const stats = this.getDisplayedStats(type);
+  if (!stats) return null;
+
+  // 🔴 pas de coche activé
+  if (!this.conditionalMode[type]) {
+    return stats;
+  }
+
+  // 🔴 appliquer "n’a pas mieux"
+  return this.applyNoBetter(stats);
+}
+
+private applyNoBetter(stats: any) {
+
+  const me = stats.me ?? 0;
+  const tie = stats.tie ?? 0;
+  const lose = stats.lose ?? 0;
+
+  const total = me + tie + lose;
+
+  if (total === 0) return stats;
+
+  return {
+    me,
+    partner: 0, // 🔴 disparaît
+    tie,
+    lose,
+
+    me_pct: (me / total) * 100,
+    partner_pct: 0,
+    tie_pct: (tie / total) * 100,
+    lose_pct: (lose / total) * 100
+  };
+}
+
 canUseConditional(type: BlockKey): boolean {
+
+  if (this.partnerFixed) return false;
+
+  // PAIRES
+  if (type === 'paires') {
+    if (!this.betConfig.partnerHasPairs) return false;
+  }
+
+  // JEU
+  if (type === 'jeu') {
+
+    const adv = this.betConfig.advHasJeu;
+
+    const teamHasJeu =
+      this.hasMyJeu() ||
+      (this.partnerFixed
+        ? this.hasPartnerJeuReal()
+        : this.betConfig.partnerHasJeu === true);
+
+    // ✅ autoriser faux-jeu
+    if (!teamHasJeu && adv === 0) {
+      return true;
+    }
+
+    // sinon logique normale
+    if (!this.betConfig.partnerHasJeu) return false;
+  }
 
   const stats = this.getStats(type);
   if (!stats) return false;
 
-  const pMe = stats.me_pct / 100;
-
-  return (
-    !this.partnerFixed &&
-    pMe > 0.20 &&
-    (type === 'grand' || type === 'petit')
-  );
-
+  return stats.me_pct > 20;
 }
-
-// getConditionalProbability(type: BlockKey): number {
-
-//   let total = 0;
-//   let win = 0;
-//   let tie = 0;
-
-//   for (const sim of this.simulations) {
-
-//     if (sim.partnerValue <= sim.meValue) {
-
-//       total++;
-
-//       if (sim.result === 'win') win++;
-//       if (sim.result === 'tie') tie++;
-
-//     }
-
-//   }
-
-//   if (total === 0) return 0;
-
-//   return (win + 0.5 * tie) / total;
-// }
 
 openKeypad() {
   this.inputMode = 'keypad';
@@ -763,28 +1831,56 @@ randomHand() {
 
 j3Values: number[] = []; // valeurs 1..10 (max 4)
 
+countValueEverywhere(value: number): number {
+
+  let count = 0;
+
+  for (const v of this.selectedValues) {
+    if (v === value) count++;
+  }
+
+  for (const v of this.j3Values) {
+    if (v === value) count++;
+  }
+
+  return count;
+}
+
 tapKey(v: number) {
+
+  // 🔴 impossible d'avoir plus de 4 cartes identiques
+  if (this.countValueEverywhere(v) >= 4) {
+
+    console.warn('Impossible : les 4 cartes existent déjà');
+
+    return;
+  }
+
   if (this.inputTarget === 'j3') {
+
     if (this.j3Values.length >= 4) return;
 
     this.j3Values.push(v);
+
     this.refreshJ3Cards();
 
-    // optionnel : masquer clavier après 4
     if (this.j3Values.length === 4) {
       this.inputMode = 'none';
     }
+
     return;
   }
 
   // J1
+
   if (this.selectedValues.length >= 4) return;
 
   this.selectedValues.push(v);
-  this.patchHandToForm(this.selectedValues);   // CLÉ
+
+  this.patchHandToForm(this.selectedValues);
+
   this.refreshHandJ1Cards();
 
-  // masquer clavier après la 4e carte
   if (this.selectedValues.length === 4) {
     this.inputMode = 'compact';
   }
@@ -856,10 +1952,205 @@ private chooseColorFileIdAvoiding(value1to10: number, alreadyChosen: number[], f
 
   // Valeurs de la main joueur 1 pour l'API (1..10)
   get handJ1Values(): number[] {
-    const v = this.form.getRawValue();
-    return [Number(v.j1_0), Number(v.j1_1), Number(v.j1_2), Number(v.j1_3)]
-      .map(x => Math.min(10, Math.max(1, Math.round(x))));
+  const v = this.form.getRawValue();
+
+  return [v.j1_0, v.j1_1, v.j1_2, v.j1_3].map(x => {
+    const val = Number(x);
+
+    // Mus : 8, 9, 10 → valent 10
+    return val >= 8 ? 10 : val;
+  });
+}
+
+  get handJ3Values(): number[] {
+    if (!this.j3Cards || this.j3Cards.length === 0) return [];
+
+    return this.j3Cards.map(c => {
+      const rank = ((c - 1) % 10) + 1;
+
+      // Mus : 8, 9, 10 → valent 10
+      return rank >= 8 ? 10 : rank;
+    });
   }
+
+  get handJ1PairValues(): number[] {
+    const v = this.form.getRawValue();
+    return [v.j1_0, v.j1_1, v.j1_2, v.j1_3].map(x => Number(x));
+  }
+
+  get handJ3PairValues(): number[] {
+    if (!this.j3Cards || this.j3Cards.length === 0) {
+      return [];
+    }
+
+    return this.j3Cards.map(c => {
+      const rank =
+        ((c - 1) % 10) + 1;
+
+      // paires :
+      // vraies valeurs 1..10
+      return rank;
+    });
+  }
+
+  getMyPairsInfo() {
+    const values = this.handJ1PairValues;    
+    const counts: Record<number, number> = {};
+
+    for (const v of values) {
+      counts[v] = (counts[v] || 0) + 1;
+    }
+
+    let pairs: number[] = [];
+    let hasMedes = false;
+
+    for (const val in counts) {
+      const count = counts[val];
+
+      if (count === 2) {
+        pairs.push(Number(val));
+      }
+
+      if (count >= 3) {
+        hasMedes = true;
+      }
+    }
+
+    return {
+      pairs,               // ex: [3] ou [2,6]
+      hasMedes,
+      bestPair: pairs.length ? Math.max(...pairs) : 0,
+      isDoublePair: pairs.length >= 2
+    };
+  }
+
+  get pairsInfo() {
+    return this.getMyPairsInfo();
+  }
+
+  private getPairsRank(values: number[]): number {
+  const counts: Record<number, number> = {};
+  for (const v of values) {
+    counts[v] = (counts[v] || 0) + 1;
+  }
+  const pairs: number[] = [];
+  let medes = 0;
+  for (const val in counts) {
+    const c = counts[val];
+    if (c === 2) {
+      pairs.push(Number(val));
+    }
+
+    if (c >= 3) {
+      medes = Number(val);
+    }
+  }
+
+  // doubles paires
+  if (pairs.length >= 2) {
+    const sorted = [...pairs].sort((a, b) => b - a);
+    return 300 + sorted[0] * 10 + sorted[1];
+  }
+
+  // mèdes
+  if (medes > 0) {
+    return 200 + medes;
+  }
+
+  // paire simple
+  if (pairs.length === 1) {
+    return 100 + pairs[0];
+  }
+  return 0;
+}
+
+  getMyPairsPoints(): number {
+    const values = this.handJ1PairValues;
+    const counts: Record<number, number> = {};
+    for (const v of values) {
+      counts[v] = (counts[v] || 0) + 1;
+    }
+    const occurrences = Object.values(counts).sort((a, b) => b - a);
+
+    // doubles paires (2+2)
+    if (occurrences[0] === 2 && occurrences[1] === 2) return 3;
+
+    // mèdes (3 cartes)
+    if (occurrences[0] === 3) return 2;
+
+    // paire simple
+    if (occurrences[0] === 2) return 1;
+
+    return 0;
+  }
+
+  getPartnerPairsPoints(): number {
+    const values = this.handJ3PairValues;
+    const counts: Record<number, number> = {};
+    for (const v of values) {
+      counts[v] = (counts[v] || 0) + 1;
+    }
+    const occurrences = Object.values(counts).sort((a, b) => b - a);
+
+    // doubles paires (2+2)
+    if (occurrences[0] === 2 && occurrences[1] === 2) return 3;
+
+    // mèdes (3 cartes)
+    if (occurrences[0] === 3) return 2;
+
+    // paire simple
+    if (occurrences[0] === 2) return 1;
+
+    return 0;
+  }
+
+  getMyJeuValue(): number {
+    const values = this.handJ1Values;
+    let total = 0;
+
+    for (const v of values) {
+      total += v;
+    }
+
+    return total;
+  }
+
+  getPartnerJeuValue(): number {
+    const values = this.handJ3Values;
+    let total = 0;
+
+    for (const v of values) {
+      total += v;
+    }
+
+    return total;
+  }
+
+  private getJeuRank(v: number): number {
+  const order = [
+    31,
+    32,
+    40,
+    37,
+    36,
+    35,
+    34,
+    33
+  ];
+  return order.indexOf(v);
+}
+
+  getMyJeuPoints(): number {
+    const values = this.handJ1Values;
+
+    const sum = values.reduce((a, b) => a + b, 0);
+
+    if (sum === 31) return 3;
+    if (sum > 30) return 2;
+
+    return 0;
+  }
+
 
   // Type interne pour index couleur 0..3
   private suits: (0 | 1 | 2 | 3)[] = [0, 1, 2, 3];
@@ -1097,14 +2388,38 @@ private addToJeuAcc(key: AdvKey, advRes: any) {
   if (!advRes) return;
 
   const acc = this.jeuAcc[key];
+
   acc.iterations += Number(advRes.iterations ?? 0);
+
   acc.matched_trials += Number(advRes.matched_trials ?? 0);
+
   acc.me += Number(advRes.me ?? 0);
+
   acc.partner += Number(advRes.partner ?? 0);
+
   acc.tie += Number(advRes.tie ?? 0);
+
   acc.lose += Number(advRes.lose ?? 0);
 
-  if (acc.matched_trials >= this.JEU_THRESHOLD) this.jeuAdvDone[key] = true;
+  // =========================
+  // 🔴 EV EQUIPE ET ADV
+  // =========================
+  
+  acc.team_points_sum += Number(advRes.team_points_sum ?? 0);
+
+  acc.opp_points_lose_sum += Number(advRes.opp_points_lose_sum ?? 0);
+  acc.opp_points_all_sum += Number(advRes.opp_points_all_sum ?? 0);
+
+  acc.team_win_count += Number(advRes.team_win_count ?? 0);
+
+  acc.opp_lose_count += Number(advRes.opp_lose_count ?? 0);
+  acc.opp_all_count += Number(advRes.opp_all_count ?? 0);
+
+  // =========================
+
+  if (acc.matched_trials >= this.condState.jeu.target) {
+    this.jeuAdvDone[key] = true;
+  }
 }
 
 private pct(n: number, d: number): number {
@@ -1125,9 +2440,37 @@ private buildJeuLine(acc: CondAdv): string {
 }
 
 private rebuildJeuDisplayDouble(): string {
+  const a1 = this.jeuAcc.adv1;
+  const a2 = this.jeuAcc.adv2;
   const l1 = this.buildJeuLine(this.jeuAcc.adv1) + (this.jeuAdvDone.adv1 ? ' 🎌' : '');
   const l2 = this.buildJeuLine(this.jeuAcc.adv2) + (this.jeuAdvDone.adv2 ? ' 🎌' : '');
   return `${l1}\n${l2}`;
+}
+
+private rebuildJeuDisplaySingle(): string {
+  const adv = this.betConfig.advHasJeu;
+  if (adv === 1) {
+    return this.formatJeuAdv(this.jeuAcc.adv1);
+  }
+  if (adv === 2) {
+    return this.formatJeuAdv(this.jeuAcc.adv2);
+  }
+  return '';
+}
+
+private formatJeuAdv(a: CondAdv): string {
+  if (!a || a.matched_trials === 0) return '';
+
+  const pct = (x: number) =>
+    Math.round((x / a.matched_trials) * 100);
+
+  const fmt = (n: number) =>
+    n.toLocaleString('fr-FR');
+
+  return `
+  ${pct(a.me)} 😀 ${pct(a.partner)} 🙂😉 ${pct(a.tie)} 👏 ${pct(a.lose)} 😭
+  (${fmt(a.matched_trials)} cf/${fmt(a.iterations)} s)
+  `;
 }
 
 // PAIRES
@@ -1137,12 +2480,7 @@ pairesDisplayDouble = '';
 jeuDisplayDouble = '';
 jeuDisplayFaux = '';
 
-private jeuAcc: Record<AdvKey, CondAdv> = {
-  adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0 },
-  adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0 },
-};
-
-private readonly JEU_THRESHOLD = 10000;
+// private readonly JEU_THRESHOLD = 4000;
 private jeuAdvDone: Record<AdvKey, boolean> = { adv1: false, adv2: false };
 
 rerunMusFromOverlay() {
@@ -1231,5 +2569,378 @@ get hasAnyCardForTarget(): boolean {
 nl2br(text: string): string {
   return text.replace(/\n/g, '<br>');
 }
+
+resolveTieDecision(
+  context: JeuTieContext,
+  answers: TieResolutionAnswers
+): TieDecision {
+
+  return {
+    alpha: 0.5,
+    resolvedStrategy: TieStrategy.MILIEU
+  };
+}
+
+private buildTieContext(type: BlockKey): JeuTieContext {
+  let advCount: 1 | 2 = 1;
+  let partnerHas = false;
+  let partnerIsDecisive = false;
+  const partnerFixed = this.partnerFixed;
+  let sharedTiePossible = false;
+  let stats: any;
+
+  if (type === 'jeu') {
+    const isFauxJeu = this.betConfig.advHasJeu === 0;
+
+    if (isFauxJeu) {
+      stats = this.lastFauxJeuResult;
+    } else {
+      const adv = this.betConfig.advHasJeu;
+
+      stats =
+        this.jeuAcc[
+          adv === 1 ? 'adv1' : 'adv2'
+        ];
+    }
+
+  } else if (type === 'paires') {
+
+    stats = this.lastPairesResult;
+  }
+
+  // =========================
+  // 🔴 PARTENAIRE FIXÉ
+  // =========================
+
+  if (partnerFixed) {
+
+    // =====================
+    // 🔴 JEU
+    // =====================
+
+    if (type === 'jeu') {
+      const myValue = this.getMyJeuValue();
+      const partnerValue = this.getPartnerJeuValue();
+      const myRank = this.getJeuRank(myValue);
+      const partnerRank = this.getJeuRank(partnerValue);
+
+      // égalité réelle
+      if (myValue === partnerValue) {
+        sharedTiePossible = true;
+
+      // partenaire meilleur
+      } else if (partnerRank < myRank) {
+        partnerIsDecisive = true;
+      }
+    }
+
+    // =====================
+    // 🔴 PAIRES
+    // =====================
+
+    if (type === 'paires') {
+      const myPoints = this.getMyPairsPoints();
+      const partnerPoints = this.getPartnerPairsPoints();
+      const myRank = this.getPairsRank(this.handJ1PairValues);
+      const partnerRank = this.getPairsRank(this.handJ3PairValues);
+
+      // égalité réelle
+      if (myRank === partnerRank) {
+        sharedTiePossible = true;
+
+      // partenaire meilleur
+      } else if (partnerRank > myRank) {
+        partnerIsDecisive = true;
+      }
+    }
+
+  // =========================
+  // 🔴 PARTENAIRE NON FIXÉ
+  // =========================
+
+  } else {
+    const me = stats?.me_pct ?? stats.me ?? 0;
+    const partner = stats?.partner_pct ?? stats.partner ?? 0;
+
+    // vraie ambiguïté statistique
+    const delta = Math.abs(me - partner);
+
+    if (me > 0 && partner > 0 && delta < 5) {
+      sharedTiePossible = true;
+
+    // partenaire statistiquement dominant
+    } else if (partner > me) {
+      partnerIsDecisive = true;
+    }
+  }
+
+  if (type === 'paires') {
+    advCount = this.betConfig.advHasPairs === 2
+      ? 2
+      : 1;
+
+    partnerHas = partnerFixed
+        ? this.hasPartnerPairsReal()
+        : (this.betConfig.partnerHasPairs ?? false);
+  }
+
+  if (type === 'jeu') {
+    advCount = this.betConfig.advHasJeu === 2
+      ? 2
+      : 1;
+
+    partnerHas = partnerFixed
+        ? this.hasPartnerJeuReal()
+        : (this.betConfig.partnerHasJeu ?? false);
+  }
+
+  const context: JeuTieContextBase = {
+    partnerHasJeu: partnerHas,
+    partnerFixed,
+    partnerIsDecisive,
+    sharedTiePossible,
+    advCount
+  };
+
+  const formType = this.determineTieFormType(context);
+  const formConfig =  this.getTieFormConfig(formType);
+
+  return {
+    ...context,
+    formType,
+    formConfig
+  };
+}
+
+private buildFauxJeuTieContext(): JeuTieContext {
+  const stats = this.lastFauxJeuResult!;
+  const partnerFixed = this.partnerFixed;
+  const advCount: 2 = 2;
+  const myFauxJeu = this.getMyJeuValue();
+  let partnerFauxJeu = -1;
+  if (partnerFixed) {
+    partnerFauxJeu = this.getPartnerJeuValue();
+  }
+
+  let partnerIsDecisive = false;
+  const partnerHasJeu = partnerFixed;
+  let formType: TieFormType;
+
+  // =========================
+  // 🔴 PARTENAIRE FIXÉ
+  // =========================
+
+  if (partnerFixed) {
+    // partenaire meilleur
+    if (partnerFauxJeu > myFauxJeu) {
+      partnerIsDecisive = true;
+      formType = TieFormType.FORM2B;
+
+    // moi meilleur
+    } else if (myFauxJeu > partnerFauxJeu) {
+      partnerIsDecisive = false;
+      formType = TieFormType.FORM2;
+
+    // égalité interne
+    } else {
+      partnerIsDecisive = true;
+      formType = TieFormType.FORM3;
+    }
+
+  // =========================
+  // 🔴 PARTENAIRE NON FIXÉ
+  // =========================
+
+  } else {
+    const mePct = stats.me_pct ?? 0;
+    const partnerPct = stats.partner_pct ?? 0;
+
+    if (mePct > partnerPct) {
+      partnerIsDecisive = false;
+      formType = TieFormType.FORM2;
+    } else if (partnerPct > mePct) {
+      partnerIsDecisive = true;
+      formType = TieFormType.FORM2B;
+    } else {
+      partnerIsDecisive = true;
+      formType = TieFormType.FORM3;
+    }
+  }
+
+  const formConfig = this.getTieFormConfig(formType);
+
+  return {
+    advCount,
+
+    partnerHasJeu,
+    partnerFixed,
+    partnerIsDecisive,
+
+    sharedTiePossible: true,
+
+    formType,
+    formConfig
+  };
+}
+
+private determineTieFormType(context: JeuTieContextBase): TieFormType {
+
+  // 🔴 égalité interne réelle
+  if (context.sharedTiePossible) {
+    return TieFormType.FORM3;
+  }
+
+  // 🔴 partenaire décisif
+  if (context.partnerIsDecisive) {
+    return context.advCount === 1
+      ? TieFormType.FORM1B
+      : TieFormType.FORM2B;
+  }
+
+  // 🔴 joueur décisif = moi
+  return context.advCount === 1
+    ? TieFormType.FORM1
+    : TieFormType.FORM2;
+}
+
+private getTieFormConfig(formType: TieFormType): TieFormConfig {
+  switch (formType) {
+    case TieFormType.FORM1:
+      return {
+        intro1: "Statistiquement, vos cartes sont meilleures que celles de votre partenaire.",
+        intro2: "Vos cartes sont meilleures que celles de votre partenaire.",
+        question: "Êtes-vous esku sur l’adversaire ?",
+
+        showEsku: true,
+        showMilieu: false,
+        showSaku: true,
+
+        alphaMap: {
+          esku: 1,
+          saku: 0
+        }
+      };
+
+    case TieFormType.FORM1B:
+      return {
+        intro1: "Statistiquement, les cartes de votre partenaire sont meilleures que les vôtres.",
+        intro2: "Les cartes de votre partenaire sont meilleures que les vôtres.",
+        question: "Votre partenaire est-il esku sur l’adversaire ?",
+
+        showEsku: true,
+        showMilieu: false,
+        showSaku: true,
+
+        alphaMap: {
+          esku: 1,
+          saku: 0
+        }
+      };
+
+    case TieFormType.FORM2:
+      return {
+        intro1: "Statistiquement, vos cartes sont meilleures que celles de votre partenaire.",
+        intro2: "Vos cartes sont meilleures que celles de votre partenaire.",
+        question: "Êtes-vous esku ?",
+
+        showEsku: true,
+        showMilieu: true,
+        showSaku: true,
+
+        alphaMap: {
+          esku: 1,
+          milieu: 0.5,
+          saku: 0
+        }
+      };
+
+    case TieFormType.FORM2B:
+      return {
+        intro1: "Statistiquement, les cartes de votre partenaire sont meilleures que les vôtres.",
+        intro2: "Les cartes de votre partenaire sont meilleures que les vôtres.",
+        question: "Votre partenaire est-il esku ?",
+
+        showEsku: true,
+        showMilieu: true,
+        showSaku: true,
+
+        alphaMap: {
+          esku: 1,
+          milieu: 0.5,
+          saku: 0
+        }
+      };
+
+    case TieFormType.FORM2C:
+      return {
+        intro1: "",
+        intro2: "",
+        question: "L’adversaire est-il esku ?",
+
+        showEsku: true,
+        showMilieu: true,
+        showSaku: true,
+
+        alphaMap: {
+          esku: 0,
+          milieu: 0.5,
+          saku: 1
+        }
+      };
+
+      case TieFormType.FORM3:
+        return {
+          intro1: "",
+          intro2: "",
+          question: "Vous et votre partenaire êtes à égalité, l'un d'entre vous est-il esku ?",
+
+          showEsku: true,
+          showMilieu: false,
+          showSaku: true,
+
+          alphaMap: {
+            esku: 1,
+            saku: 0.5
+          }
+        };
+
+        default:
+          return {
+            intro1:"",
+            intro2:"",
+            question: "",
+            showEsku: true,
+            showMilieu: true,
+            showSaku: true,
+
+            alphaMap: {
+              esku: 1,
+              milieu: 0.5,
+              saku: 0
+            }
+          };
+  }
+}
+
+private strategyToAlpha(strategy: TieStrategy): number {
+  switch(strategy) {
+    case TieStrategy.ESKU:
+      return 1;
+    case TieStrategy.SAKU:
+      return 0;
+    default:
+      return 0.5;
+  }
+}
+
+tieContext: JeuTieContext | null = {
+  advCount: 1,
+  partnerHasJeu: false,
+  partnerFixed: false,
+  partnerIsDecisive: false,
+  sharedTiePossible: false,
+  formType: TieFormType.FORM1,
+  formConfig: this.getTieFormConfig(TieFormType.FORM1)
+};
 
 }
