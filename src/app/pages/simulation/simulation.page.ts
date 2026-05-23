@@ -78,7 +78,7 @@ openEsperance(type: BlockKey) {
       stats = this.lastFauxJeuResult;
     } else {
       const adv = this.betConfig.advHasJeu;
-      stats = this.jeuAcc[adv === 1 ? 'adv1' : 'adv2'];
+      stats = this.evJeuAcc[adv === 1 ? 'adv1' : 'adv2'];
     }
 
   } else if (type === 'paires') {
@@ -237,8 +237,8 @@ openAdvJeu() {
     hand_j1: base.hand_j1,
     hand_j3: base.hand_j3,
     bet: 'jeu' as const,
-    iterations_adv1: this.jeuAdvDone.adv1 ? 1 : (this.n1Simul ?? 60000),
-    iterations_adv2: this.jeuAdvDone.adv2 ? 1 : (this.n2Simul ?? 200000),
+    iterations_adv1: this.condJeuAdvDone.adv1 ? 1 : (this.n1Simul ?? 60000),
+    iterations_adv2: this.condJeuAdvDone.adv2 ? 1 : (this.n2Simul ?? 200000),
   };
 
   this.jeuEstimateText = 'Calculs en cours…';
@@ -246,15 +246,17 @@ openAdvJeu() {
   this.api.simulateCondBetDouble(body).subscribe({
     next: (r: any) => {
       // accumulation affichage
-      this.addToJeuAcc('adv1', r?.results?.adv1);
-      this.addToJeuAcc('adv2', r?.results?.adv2);
+      this.addToCondJeuAcc('adv1', r?.results?.adv1);
+      this.addToCondJeuAcc('adv2', r?.results?.adv2);
 
       // affichage
       this.jeuEstimateText = this.rebuildJeuDisplayDouble();
+      this.condState.jeu.loading = false;
     },
     error: (err: any) => {
       console.error(err);
       this.jeuEstimateText = 'Erreur API';
+      this.condState.jeu.loading = false;
     }
   });
 }
@@ -322,7 +324,14 @@ selectedTieStrategy: TieStrategy = TieStrategy.MILIEU;
 
 isFauxJeu =false;
 
-private jeuAcc: Record<AdvKey, CondAdv> = {
+private condJeuAcc: Record<AdvKey, CondAdv> = {
+  adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0, 
+    team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+  adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0, 
+    team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+};
+
+private evJeuAcc: Record<AdvKey, CondAdv> = {
   adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0, 
     team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
   adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0, 
@@ -352,6 +361,11 @@ choosePartnerHand() {
   startResult: Simul1Response | null = null;
 
   condState = {
+    paires: { loading: false, done: false },
+    jeu: { loading: false, count: 0, target: 10000 }
+  };
+
+  evState = {
     paires: { loading: false, done: false },
     jeu: { loading: false, count: 0, target: 4000 }
   };
@@ -385,11 +399,11 @@ choosePartnerHand() {
     // if (this.partnerFixed) return true;
 
     if (type === 'paires') {
-      return this.condState.paires.done;
+      return this.evState.paires.done;
     }
 
     if (type === 'jeu') {
-      return this.condState.jeu.count >= this.condState.jeu.target;
+      return this.evState.jeu.count >= this.evState.jeu.target;
     }
 
     return false;
@@ -407,13 +421,13 @@ choosePartnerHand() {
     if (type === 'grand' || type === 'petit') return '🙏';
 
     if (type === 'paires') {
-      const s = this.condState.paires;
+      const s = this.evState.paires;
       if (s.loading) return '⏳';
       return s.done ? '🙏' : '🎲';
     }
 
     if (type === 'jeu') {
-      const s = this.condState.jeu;
+      const s = this.evState.jeu;
 
       if (s.loading) return '⏳';
       if (this.autoRunning) return '⏳';
@@ -442,7 +456,7 @@ choosePartnerHand() {
     }
 
     if (type === 'paires') {
-      if (this.condState.paires.done) {
+      if (this.evState.paires.done) {
         this.openEsperance(type);
       } else {
         this.runBetPaires();
@@ -451,7 +465,7 @@ choosePartnerHand() {
     }
 
     if (type === 'jeu') {
-      if (this.condState.jeu.count >= this.condState.jeu.target || this.autoDone) {
+      if (this.evState.jeu.count >= this.evState.jeu.target || this.autoDone) {
         this.openEsperance(type);
       } else {
         this.runBetJeu();
@@ -460,7 +474,7 @@ choosePartnerHand() {
     }
   }
 
-  runConditionalSimulation(type: BlockKey): Promise<void> {
+  runEvSimulation(type: BlockKey): Promise<void> {
   const requestId = ++this.requestIds.jeu;  
   const base = this.buildPayload(1);
   if (!base) return Promise.resolve();
@@ -480,11 +494,11 @@ choosePartnerHand() {
 
     no_better: isCond,
 
-    iterations_adv1: this.jeuAdvDone.adv1 ? 1 : iterAdv1,
-    iterations_adv2: this.jeuAdvDone.adv2 ? 1 : 1000000,
+    iterations_adv1: this.evJeuAdvDone.adv1 ? 1 : iterAdv1,
+    iterations_adv2: this.evJeuAdvDone.adv2 ? 1 : 1000000,
   };
 
-  this.condState.jeu.loading = true;
+  this.evState.jeu.loading = true;
 
   return new Promise((resolve, reject) => {
     this.api.simulateCondBetDoubleFiltered(body).subscribe({
@@ -493,25 +507,25 @@ choosePartnerHand() {
           return;
         }
         
-        this.condState.jeu.loading = false;
+        this.evState.jeu.loading = false;
         const adv = this.betConfig.advHasJeu;
 
         if (adv === 1) {
-          this.addToJeuAcc('adv1', r?.results?.adv1);
-          this.condState.jeu.count += r?.results?.adv1?.matched_trials ?? 0;
+          this.addToEvJeuAcc('adv1', r?.results?.adv1);
+          this.evState.jeu.count += r?.results?.adv1?.matched_trials ?? 0;
         }
 
         if (adv === 2) {
-          this.addToJeuAcc('adv2', r?.results?.adv2);
-          this.condState.jeu.count += r?.results?.adv2?.matched_trials ?? 0;
+          this.addToEvJeuAcc('adv2', r?.results?.adv2);
+          this.evState.jeu.count += r?.results?.adv2?.matched_trials ?? 0;
         }
 
-        this.betJeuEstimateText = this.rebuildJeuDisplaySingle();
+        this.betJeuEstimateText = this.rebuildEvJeuDisplaySingle();
 
         // 🔴 TEST ICI (après accumulation)
         const res = adv === 1 ? r?.results?.adv1 : r?.results?.adv2;
 
-        const cf = this.condState.jeu.count;
+        const cf = this.evState.jeu.count;
         const winPct = (res?.me_pct ?? 0) + (res?.partner_pct ?? 0);
 
         // 🔴 1. CALCUL ERREUR (toujours)
@@ -580,8 +594,8 @@ cancelRareCase() {
     }
 
     // 🔴 important : on repart propre
-    this.condState.paires.done = false;
-    this.condState.jeu.count = 0;
+    this.evState.paires.done = false;
+    this.evState.jeu.count = 0;
   }
 
   hasPartnerReal(type: BlockKey): boolean {
@@ -767,7 +781,7 @@ cancelRareCase() {
         this.conditionalMode['paires'] = false;
       }
 
-      if(this.condState.paires.loading) {
+      if(this.evState.paires.loading) {
         this.requestIds.paires++;
       }
       this.resetPaires();
@@ -786,7 +800,7 @@ cancelRareCase() {
         this.conditionalMode['jeu'] = false;
       }
 
-      if(this.condState.jeu.loading) {
+      if(this.evState.jeu.loading) {
         this.requestIds.jeu++;
       }
       this.resetJeu();
@@ -804,7 +818,7 @@ cancelRareCase() {
 
   resetBetState() {
     // --- PAIRES ---
-    this.condState.paires = {
+    this.evState.paires = {
       done: false,
       loading: false
     };
@@ -813,7 +827,7 @@ cancelRareCase() {
     this.conditionalMode['paires'] = false;
 
     // --- JEU ---
-    this.condState.jeu = {
+    this.evState.jeu = {
       count: 0,
       target: 4000,
       loading: false
@@ -824,23 +838,23 @@ cancelRareCase() {
     this.conditionalMode['jeu'] = false;
 
     // cumul jeu
-    this.resetJeuAcc();
+    this.resetEvJeuAcc();
 
-    this.jeuAdvDone = {
+    this.evJeuAdvDone = {
       adv1: false,
       adv2: false
     };
   }
 
   resetPaires() {
-    this.condState.paires.done = false;
-    this.condState.paires.loading = false;
+    this.evState.paires.done = false;
+    this.evState.paires.loading = false;
     this.betPairesEstimateText = '';
   }
 
   resetJeu() {
-    this.condState.jeu.count = 0;
-    this.condState.jeu.loading = false;
+    this.evState.jeu.count = 0;
+    this.evState.jeu.loading = false;
 
     this.betJeuEstimateText = '';
     this.betFauxJeuEstimateText = '';
@@ -849,16 +863,27 @@ cancelRareCase() {
     this.autoRunning = false;
     this.autoStep = 0;
 
-    this.resetJeuAcc(); // 🔴 TRÈS IMPORTANT
+    this.resetEvJeuAcc(); // 🔴 TRÈS IMPORTANT
   }
 
-  resetJeuAcc() {
-    this.jeuAcc = {
+  resetCondJeuAcc() {
+    this.condJeuAcc = {
       adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0,
         team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
       adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0,
         team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
     };
+    this.condJeuAdvDone = {adv1: false, adv2: false};
+  }
+
+  resetEvJeuAcc() {
+    this.evJeuAcc = {
+      adv1: { adv: 1, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0,
+        team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+      adv2: { adv: 2, iterations: 0, matched_trials: 0, me: 0, partner: 0, tie: 0, lose: 0,
+        team_points_sum: 0, team_win_count: 0, opp_lose_count: 0, opp_all_count: 0, opp_points_lose_sum: 0, opp_points_all_sum: 0 },
+    };
+    this.evJeuAdvDone = {adv1: false, adv2: false};
   }
   
   onModeChange(event: any) {
@@ -886,7 +911,7 @@ cancelRareCase() {
       this.conditionalMode['paires'] = false;
     }
 
-    if(this.condState.paires.loading) {
+    if(this.evState.paires.loading) {
       this.requestIds.paires++;
       }
     this.resetPaires();
@@ -899,7 +924,7 @@ cancelRareCase() {
       this.conditionalMode['jeu'] = false;
     }
 
-    if(this.condState.jeu.loading) {
+    if(this.evState.jeu.loading) {
     this.requestIds.jeu++;
     }
     this.resetJeu();
@@ -1027,11 +1052,12 @@ exitMode() {
   this.fauxJeuEstimateText = '';
 
   // Cumul jeu
-  this.resetJeuAcc();
-  this.jeuAdvDone = { adv1: false, adv2: false };
+  this.resetCondJeuAcc();
+  this.condJeuAdvDone = { adv1: false, adv2: false };
 
   // Paris
   this.resetBetState();
+  this.evJeuAdvDone = { adv1: false, adv2: false };
 
   // 6) selections/états UI
   this.discardIndexes?.clear?.();
@@ -1056,14 +1082,14 @@ onConditionalToggle(type: BlockKey, value: boolean) {
   this.conditionalMode[type] = value;
 
   if (type === 'jeu') {
-    if(this.condState.jeu.loading) {
+    if(this.evState.jeu.loading) {
       this.requestIds.jeu++;
     }
     this.resetJeu();
   }
 
   if (type === 'paires') {
-    if(this.condState.paires.loading) {
+    if(this.evState.paires.loading) {
       this.requestIds.paires++;
     }
     this.resetPaires();
@@ -1260,8 +1286,8 @@ runBetPaires() {
     iterations_adv2,
   };
 
-  this.condState.paires.loading = true;
-  this.condState.paires.done = false;
+  this.evState.paires.loading = true;
+  this.evState.paires.done = false;
 
   this.api.simulateCondBetDoubleFiltered(body).subscribe({
 
@@ -1287,8 +1313,8 @@ runBetPaires() {
             .replace(/^Contre.*?:\s*/, '');
       }
 
-      this.condState.paires.loading = false;
-      this.condState.paires.done = true;
+      this.evState.paires.loading = false;
+      this.evState.paires.done = true;
     },
 
     error: (err: any) => {
@@ -1301,7 +1327,7 @@ runBetPaires() {
       console.error(err);
 
       this.betPairesEstimateText = 'Erreur API';
-      this.condState.paires.loading = false;
+      this.evState.paires.loading = false;
     }
   });
 }
@@ -1309,7 +1335,7 @@ runBetPaires() {
 runBetJeu() {
   this.hasCheckedRareCase = false;
   this.autoRunning = false;
-  this.condState.jeu.loading = true;
+  this.evState.jeu.loading = true;
   this.rareCaseMessage = null;
   this.showAutoRunButton = false;
   this.errorText = null;
@@ -1336,7 +1362,7 @@ runBetJeu() {
         const display = (r?.display ?? '').toString();
         const matched = r?.matched_trials ?? 0;
         const iterations = r?.iterations ?? 0;
-        this.condState.jeu.count = matched;
+        this.evState.jeu.count = matched;
         const suffix =`\n(${matched.toLocaleString('fr-FR')} cf/${iterations.toLocaleString('fr-FR')} s)`;
 
         const winPct = (r?.me_pct ?? 0) + (r?.partner_pct ?? 0);
@@ -1352,7 +1378,7 @@ runBetJeu() {
         // this. = winPct < 1;
 
         this.betFauxJeuEstimateText = display + suffix;
-        this.condState.jeu.loading = false;
+        this.evState.jeu.loading = false;
       },
       error: (err: any) => {
         console.error(err);
@@ -1364,7 +1390,7 @@ runBetJeu() {
   }
 
   // ✅ CAS NORMAL (jeu)
-  this.runConditionalSimulation('jeu');
+  this.runEvSimulation('jeu');
 }
 
 async showRareCasePrompt(type: BlockKey) {
@@ -1385,7 +1411,7 @@ async autoRun(type: BlockKey) {
 
   for (let i = 0; i < 9; i++) {
     this.autoStep = i + 2; // 2 → 10
-    await this.runConditionalSimulation(type);
+    await this.runEvSimulation(type);
   }
 
   this.autoRunning = false;
@@ -1665,7 +1691,7 @@ getProbability(type: BlockKey): number {
 
     // ===== JEU NORMAL =====
     const adv = this.betConfig.advHasJeu;
-    const stats = this.jeuAcc[adv === 1 ? 'adv1' : 'adv2'];
+    const stats = this.evJeuAcc[adv === 1 ? 'adv1' : 'adv2'];
     if (!stats || stats.matched_trials === 0) {
       return 0;
     }
@@ -2384,27 +2410,20 @@ private buildHandFileIdsFromValues(values: number[], usedGlobal: Set<number>): n
   return hand;
 }
 
-private addToJeuAcc(key: AdvKey, advRes: any) {
+private addToCondJeuAcc(key: AdvKey, advRes: any) {
+
   if (!advRes) return;
 
-  const acc = this.jeuAcc[key];
+  const acc = this.condJeuAcc[key];
 
   acc.iterations += Number(advRes.iterations ?? 0);
-
   acc.matched_trials += Number(advRes.matched_trials ?? 0);
 
   acc.me += Number(advRes.me ?? 0);
-
   acc.partner += Number(advRes.partner ?? 0);
-
   acc.tie += Number(advRes.tie ?? 0);
-
   acc.lose += Number(advRes.lose ?? 0);
 
-  // =========================
-  // 🔴 EV EQUIPE ET ADV
-  // =========================
-  
   acc.team_points_sum += Number(advRes.team_points_sum ?? 0);
 
   acc.opp_points_lose_sum += Number(advRes.opp_points_lose_sum ?? 0);
@@ -2415,12 +2434,73 @@ private addToJeuAcc(key: AdvKey, advRes: any) {
   acc.opp_lose_count += Number(advRes.opp_lose_count ?? 0);
   acc.opp_all_count += Number(advRes.opp_all_count ?? 0);
 
-  // =========================
-
   if (acc.matched_trials >= this.condState.jeu.target) {
-    this.jeuAdvDone[key] = true;
+    this.condJeuAdvDone[key] = true;
   }
 }
+
+private addToEvJeuAcc(key: AdvKey, advRes: any) {
+
+  if (!advRes) return;
+
+  const acc = this.evJeuAcc[key];
+
+  acc.iterations += Number(advRes.iterations ?? 0);
+  acc.matched_trials += Number(advRes.matched_trials ?? 0);
+
+  acc.me += Number(advRes.me ?? 0);
+  acc.partner += Number(advRes.partner ?? 0);
+  acc.tie += Number(advRes.tie ?? 0);
+  acc.lose += Number(advRes.lose ?? 0);
+
+  acc.team_points_sum += Number(advRes.team_points_sum ?? 0);
+
+  acc.opp_points_lose_sum += Number(advRes.opp_points_lose_sum ?? 0);
+  acc.opp_points_all_sum += Number(advRes.opp_points_all_sum ?? 0);
+
+  acc.team_win_count += Number(advRes.team_win_count ?? 0);
+
+  acc.opp_lose_count += Number(advRes.opp_lose_count ?? 0);
+  acc.opp_all_count += Number(advRes.opp_all_count ?? 0);
+
+  if (acc.matched_trials >= this.evState.jeu.target) {
+    this.evJeuAdvDone[key] = true;
+  }
+}
+
+
+// private addToJeuAcc(key: AdvKey, advRes: any) {
+//   console.log("addToJeuAcc")
+//   if (!advRes) return;
+
+//   const acc = this.condJeuAcc[key];
+//   acc.iterations += Number(advRes.iterations ?? 0);
+//   acc.matched_trials += Number(advRes.matched_trials ?? 0);
+//   acc.me += Number(advRes.me ?? 0);
+//   acc.partner += Number(advRes.partner ?? 0);
+//   acc.tie += Number(advRes.tie ?? 0);
+//   acc.lose += Number(advRes.lose ?? 0);
+
+//   // =========================
+//   // 🔴 EV EQUIPE ET ADV
+//   // =========================
+  
+//   acc.team_points_sum += Number(advRes.team_points_sum ?? 0);
+
+//   acc.opp_points_lose_sum += Number(advRes.opp_points_lose_sum ?? 0);
+//   acc.opp_points_all_sum += Number(advRes.opp_points_all_sum ?? 0);
+
+//   acc.team_win_count += Number(advRes.team_win_count ?? 0);
+
+//   acc.opp_lose_count += Number(advRes.opp_lose_count ?? 0);
+//   acc.opp_all_count += Number(advRes.opp_all_count ?? 0);
+
+//   // =========================
+
+//   if (acc.matched_trials >= this.condState.jeu.target) {
+//     this.condJeuAdvDone[key] = true;
+//   }
+// }
 
 private pct(n: number, d: number): number {
   return d > 0 ? Math.round((n * 10000) / d) / 100 : 0;
@@ -2440,20 +2520,20 @@ private buildJeuLine(acc: CondAdv): string {
 }
 
 private rebuildJeuDisplayDouble(): string {
-  const a1 = this.jeuAcc.adv1;
-  const a2 = this.jeuAcc.adv2;
-  const l1 = this.buildJeuLine(this.jeuAcc.adv1) + (this.jeuAdvDone.adv1 ? ' 🎌' : '');
-  const l2 = this.buildJeuLine(this.jeuAcc.adv2) + (this.jeuAdvDone.adv2 ? ' 🎌' : '');
+  const a1 = this.condJeuAcc.adv1;
+  const a2 = this.condJeuAcc.adv2;
+  const l1 = this.buildJeuLine(this.condJeuAcc.adv1) + (this.condJeuAdvDone.adv1 ? ' 🎌' : '');
+  const l2 = this.buildJeuLine(this.condJeuAcc.adv2) + (this.condJeuAdvDone.adv2 ? ' 🎌' : '');
   return `${l1}\n${l2}`;
 }
 
-private rebuildJeuDisplaySingle(): string {
+private rebuildEvJeuDisplaySingle(): string {
   const adv = this.betConfig.advHasJeu;
   if (adv === 1) {
-    return this.formatJeuAdv(this.jeuAcc.adv1);
+    return this.formatJeuAdv(this.evJeuAcc.adv1);
   }
   if (adv === 2) {
-    return this.formatJeuAdv(this.jeuAcc.adv2);
+    return this.formatJeuAdv(this.evJeuAcc.adv2);
   }
   return '';
 }
@@ -2468,7 +2548,7 @@ private formatJeuAdv(a: CondAdv): string {
     n.toLocaleString('fr-FR');
 
   return `
-  ${pct(a.me)} 😀 ${pct(a.partner)} 🙂😉 ${pct(a.tie)} 👏 ${pct(a.lose)} 😭
+  ${pct(a.me)}😀 ${pct(a.partner)}🙂😉 ${pct(a.tie)}👏 ${pct(a.lose)}😭
   (${fmt(a.matched_trials)} cf/${fmt(a.iterations)} s)
   `;
 }
@@ -2481,7 +2561,8 @@ jeuDisplayDouble = '';
 jeuDisplayFaux = '';
 
 // private readonly JEU_THRESHOLD = 4000;
-private jeuAdvDone: Record<AdvKey, boolean> = { adv1: false, adv2: false };
+private condJeuAdvDone: Record<AdvKey, boolean> = { adv1: false, adv2: false };
+private evJeuAdvDone: Record<AdvKey, boolean> = { adv1: false, adv2: false };
 
 rerunMusFromOverlay() {
   // si tu veux forcer une nouvelle seed même si l'utilisateur a laissé seed=0
@@ -2598,7 +2679,7 @@ private buildTieContext(type: BlockKey): JeuTieContext {
       const adv = this.betConfig.advHasJeu;
 
       stats =
-        this.jeuAcc[
+        this.evJeuAcc[
           adv === 1 ? 'adv1' : 'adv2'
         ];
     }

@@ -308,13 +308,13 @@
             </ion-row>
           }
 
-          @if (b.key === 'paires' && condState.paires.done) {
+          @if (b.key === 'paires' && evState.paires.done) {
             <div class="conditional-text">
               {{ betPairesEstimateText }}
             </div>
           }
 
-          @if (b.key === 'jeu' && condState.jeu.count > 0) {
+          @if (b.key === 'jeu' && evState.jeu.count > 0) {
             <div class="conditional-text">
               {{ betJeuEstimateText || betFauxJeuEstimateText }}
             </div>
