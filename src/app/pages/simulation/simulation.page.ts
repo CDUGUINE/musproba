@@ -143,15 +143,18 @@ openEsperance(type: BlockKey) {
 
     } else {
       // 🔴 cas API directe (paires / grand)
-      pMe = (stats.me_pct ?? 0) / 100;
-      pPartner = (stats.partner_pct ?? 0) / 100;
-      pLose = (stats.lose_pct ?? 0) / 100;
-      pTie = (stats.tie_pct ?? 0) / 100;
+      const displayed = this.getDisplayedStats(type);
+      if (!displayed) return;
+
+      pMe = (displayed.me_pct ?? 0) / 100;
+      pPartner = (displayed.partner_pct ?? 0) / 100;
+      pLose = (displayed.lose_pct ?? 0) / 100;
+      pTie = (displayed.tie_pct ?? 0) / 100;
 
       pWin =
-        ((stats.me_pct ?? 0) +
-         (stats.partner_pct ?? 0) +
-         0.5 * (stats.tie_pct ?? 0)) / 100;
+        ((displayed.me_pct ?? 0) +
+        (displayed.partner_pct ?? 0) +
+        0.5 * (displayed.tie_pct ?? 0)) / 100;
 
       if (type === 'paires') {
         avgTeamPointsWin = stats.avg_team_points_win ?? 0;
